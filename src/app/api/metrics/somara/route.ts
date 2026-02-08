@@ -7,6 +7,9 @@ import {
   fetchOrgBillingBreakdown,
   fetchTopModels,
   fetchCreditsOverview,
+  fetchBusinessKPIs,
+  fetchSubscriptionsOverTime,
+  fetchCreditPurchasesOverTime,
 } from "@/lib/integrations/somara/queries";
 import { transformSomaraMetrics } from "@/lib/integrations/somara/transform";
 import {
@@ -64,6 +67,9 @@ export async function GET(
         orgBillingBreakdown,
         topModels,
         creditsOverview,
+        businessKpis,
+        subscriptionsOverTime,
+        creditPurchasesOverTime,
       ] = await Promise.all([
         fetchKPIs(startDate, endDate),
         fetchActivityOverTime(startDate, endDate),
@@ -72,6 +78,9 @@ export async function GET(
         fetchOrgBillingBreakdown(),
         fetchTopModels(),
         fetchCreditsOverview(),
+        fetchBusinessKPIs(),
+        fetchSubscriptionsOverTime(startDate, endDate),
+        fetchCreditPurchasesOverTime(startDate, endDate),
       ]);
 
       const metrics = transformSomaraMetrics({
@@ -82,6 +91,9 @@ export async function GET(
         orgBillingBreakdown,
         topModels,
         creditsOverview,
+        businessKpis,
+        subscriptionsOverTime,
+        creditPurchasesOverTime,
         startDate,
         endDate,
       });
@@ -135,6 +147,9 @@ export async function GET(
         orgBillingBreakdown,
         topModels,
         creditsOverview,
+        businessKpis,
+        subscriptionsOverTime,
+        creditPurchasesOverTime,
       ] = await Promise.all([
         fetchKPIs(startDate, endDate),
         fetchActivityOverTime(startDate, endDate),
@@ -143,6 +158,9 @@ export async function GET(
         fetchOrgBillingBreakdown(),
         fetchTopModels(),
         fetchCreditsOverview(),
+        fetchBusinessKPIs(),
+        fetchSubscriptionsOverTime(startDate, endDate),
+        fetchCreditPurchasesOverTime(startDate, endDate),
       ]);
 
       const metrics = transformSomaraMetrics({
@@ -153,6 +171,9 @@ export async function GET(
         orgBillingBreakdown,
         topModels,
         creditsOverview,
+        businessKpis,
+        subscriptionsOverTime,
+        creditPurchasesOverTime,
         startDate,
         endDate,
       });

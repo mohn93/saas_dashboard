@@ -43,6 +43,21 @@ export interface RawCredits {
   total_remaining: number;
 }
 
+export interface RawBusinessKPIs {
+  active_subscribers: number;
+  credits_purchased: number;
+}
+
+export interface RawDailySubscriptions {
+  date: string;
+  cumulative: number;
+}
+
+export interface RawDailyCreditPurchases {
+  date: string;
+  credits: number;
+}
+
 /**
  * Fetch all 6 KPI values for the Somara platform.
  */
@@ -240,5 +255,75 @@ export async function fetchCreditsOverview(): Promise<RawCredits[]> {
     total_granted: Number(row.total_granted),
     total_consumed: Number(row.total_consumed),
     total_remaining: Number(row.total_remaining),
+  }));
+}
+
+/**
+ * Fetch business KPIs: active subscribers + total credits purchased.
+ */
+export async function fetchBusinessKPIs(): Promise<RawBusinessKPIs> {
+  const supabase = getSomaraClient();
+
+  const { data, error } = await supabase.rpc("get_somara_business_kpis");
+
+  if (error) {
+    console.error("Error fetching Somara business KPIs:", error);
+    return { active_subscribers: 0, credits_purchased: 0 };
+  }
+
+  const row = data?.[0] as Record<string, unknown> | undefined;
+  return {
+    active_subscribers: Number(row?.active_subscribers ?? 0),
+    credits_purchased: Number(row?.credits_purchased ?? 0),
+  };
+}
+
+/**
+ * Fetch cumulative active subscriptions per day.
+ */
+export async function fetchSubscriptionsOverTime(
+  startDate: Date,
+  endDate: Date
+): Promise<RawDailySubscriptions[]> {
+  const supabase = getSomaraClient();
+
+  const { data, error } = await supabase.rpc("get_somara_subscriptions_over_time", {
+    start_date: startDate.toISOString(),
+    end_date: endDate.toISOString(),
+  });
+
+  if (error) {
+    console.error("Error fetching Somara subscriptions over time:", error);
+    return [];
+  }
+
+  return (data || []).map((row: Record<string, unknown>) => ({
+    date: row.date as string,
+    cumulative: Number(row.cumulative),
+  }));
+}
+
+/**
+ * Fetch daily credit purchase volumes.
+ */
+export async function fetchCreditPurchasesOverTime(
+  startDate: Date,
+  endDate: Date
+): Promise<RawDailyCreditPurchases[]> {
+  const supabase = getSomaraClient();
+
+  const { data, error } = await supabase.rpc("get_somara_credit_purchases_over_time", {
+    start_date: startDate.toISOString(),
+    end_date: endDate.toISOString(),
+  });
+
+  if (error) {
+    console.error("Error fetching Somara credit purchases over time:", error);
+    return [];
+  }
+
+  return (data || []).map((row: Record<string, unknown>) => ({
+    date: row.date as string,
+    credits: Number(row.credits),
   }));
 }

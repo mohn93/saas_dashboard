@@ -2,9 +2,12 @@ import { addDays, format } from "date-fns";
 import type {
   SomaraMetrics,
   SomaraKPIs,
+  SomaraBusinessKPIs,
   DailyActivity,
   DailySignups,
   DailyTokens,
+  DailySubscriptions,
+  DailyCreditPurchases,
   OrgBillingBreakdown,
   ModelUsage,
   CreditsOverview,
@@ -17,6 +20,9 @@ import type {
   RawOrgBilling,
   RawModelUsage,
   RawCredits,
+  RawBusinessKPIs,
+  RawDailySubscriptions,
+  RawDailyCreditPurchases,
 } from "./queries";
 
 function generateDateRange(startDate: Date, endDate: Date): string[] {
@@ -92,6 +98,46 @@ function transformCredits(raw: RawCredits[]): CreditsOverview[] {
   }));
 }
 
+function transformBusinessKPIs(
+  raw: RawBusinessKPIs,
+  totalUsers: number
+): SomaraBusinessKPIs {
+  return {
+    activeSubscribers: raw.active_subscribers,
+    creditsPurchased: raw.credits_purchased,
+    signupToPaidRate: totalUsers > 0 ? raw.active_subscribers / totalUsers : 0,
+  };
+}
+
+function fillSubscriptionsOverTime(
+  sparse: RawDailySubscriptions[],
+  allDates: string[]
+): DailySubscriptions[] {
+  const byDate = new Map(sparse.map((r) => [r.date, r.cumulative]));
+
+  // For cumulative data, carry forward the last known value
+  let lastValue = 0;
+  return allDates.map((date) => {
+    const value = byDate.get(date);
+    if (value !== undefined) {
+      lastValue = value;
+    }
+    return { date, cumulative: lastValue };
+  });
+}
+
+function fillCreditPurchasesOverTime(
+  sparse: RawDailyCreditPurchases[],
+  allDates: string[]
+): DailyCreditPurchases[] {
+  const byDate = new Map(sparse.map((r) => [r.date, r.credits]));
+
+  return allDates.map((date) => ({
+    date,
+    credits: byDate.get(date) || 0,
+  }));
+}
+
 export function transformSomaraMetrics(params: {
   kpis: RawKPIs;
   activityOverTime: RawDailyActivity[];
@@ -100,6 +146,9 @@ export function transformSomaraMetrics(params: {
   orgBillingBreakdown: RawOrgBilling[];
   topModels: RawModelUsage[];
   creditsOverview: RawCredits[];
+  businessKpis: RawBusinessKPIs;
+  subscriptionsOverTime: RawDailySubscriptions[];
+  creditPurchasesOverTime: RawDailyCreditPurchases[];
   startDate: Date;
   endDate: Date;
 }): SomaraMetrics {
@@ -113,5 +162,8 @@ export function transformSomaraMetrics(params: {
     orgBillingBreakdown: transformOrgBilling(params.orgBillingBreakdown),
     topModels: transformModels(params.topModels),
     creditsOverview: transformCredits(params.creditsOverview),
+    businessKpis: transformBusinessKPIs(params.businessKpis, params.kpis.totalUsers),
+    subscriptionsOverTime: fillSubscriptionsOverTime(params.subscriptionsOverTime, allDates),
+    creditPurchasesOverTime: fillCreditPurchasesOverTime(params.creditPurchasesOverTime, allDates),
   };
 }

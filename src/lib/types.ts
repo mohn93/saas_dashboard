@@ -170,6 +170,22 @@ export interface CreditsOverview {
   totalRemaining: number;
 }
 
+export interface SomaraBusinessKPIs {
+  activeSubscribers: number;
+  creditsPurchased: number;
+  signupToPaidRate: number; // 0-1
+}
+
+export interface DailySubscriptions {
+  date: string; // YYYY-MM-DD
+  cumulative: number;
+}
+
+export interface DailyCreditPurchases {
+  date: string; // YYYY-MM-DD
+  credits: number;
+}
+
 export interface SomaraMetrics {
   kpis: SomaraKPIs;
   activityOverTime: DailyActivity[];
@@ -178,4 +194,7 @@ export interface SomaraMetrics {
   orgBillingBreakdown: OrgBillingBreakdown[];
   topModels: ModelUsage[];
   creditsOverview: CreditsOverview[];
+  businessKpis: SomaraBusinessKPIs;
+  subscriptionsOverTime: DailySubscriptions[];
+  creditPurchasesOverTime: DailyCreditPurchases[];
 }

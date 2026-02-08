@@ -21,6 +21,9 @@ import { MRRChart } from "@/components/charts/mrr-chart";
 import { SignupsChart } from "@/components/charts/signups-chart";
 import { HealthStatusChart } from "@/components/charts/health-status-chart";
 import { SomaraKPIGrid } from "@/components/dashboard/somara-kpi-grid";
+import { SomaraBusinessKPIGrid } from "@/components/dashboard/somara-business-kpi-grid";
+import { SubscriptionsChart } from "@/components/charts/subscriptions-chart";
+import { CreditPurchasesChart } from "@/components/charts/credit-purchases-chart";
 import { ActivityChart } from "@/components/charts/activity-chart";
 import { TokenUsageChart } from "@/components/charts/token-usage-chart";
 import { OrgBillingChart } from "@/components/charts/org-billing-chart";
@@ -60,6 +63,12 @@ const emptySomaraKPIs = {
   totalMessages: 0,
   totalChats: 0,
   tokensUsed: 0,
+};
+
+const emptySomaraBusinessKPIs = {
+  activeSubscribers: 0,
+  creditsPurchased: 0,
+  signupToPaidRate: 0,
 };
 
 function ProductContent() {
@@ -248,6 +257,42 @@ function ProductContent() {
             <ChartErrorBoundary fallbackMessage="Failed to load credits overview">
               <CreditsTable
                 data={somaraMetrics.data?.creditsOverview || []}
+                loading={somaraMetrics.loading}
+                error={somaraMetrics.error}
+              />
+            </ChartErrorBoundary>
+          </div>
+
+          <Separator />
+
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              Business Metrics
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Subscription health and credit revenue for {product.name}
+            </p>
+          </div>
+
+          <ChartErrorBoundary fallbackMessage="Failed to load business KPIs">
+            <SomaraBusinessKPIGrid
+              kpis={somaraMetrics.data?.businessKpis || emptySomaraBusinessKPIs}
+              loading={somaraMetrics.loading}
+            />
+          </ChartErrorBoundary>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ChartErrorBoundary fallbackMessage="Failed to load subscriptions chart">
+              <SubscriptionsChart
+                data={somaraMetrics.data?.subscriptionsOverTime || []}
+                loading={somaraMetrics.loading}
+                error={somaraMetrics.error}
+              />
+            </ChartErrorBoundary>
+
+            <ChartErrorBoundary fallbackMessage="Failed to load credit purchases chart">
+              <CreditPurchasesChart
+                data={somaraMetrics.data?.creditPurchasesOverTime || []}
                 loading={somaraMetrics.loading}
                 error={somaraMetrics.error}
               />
