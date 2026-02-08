@@ -72,12 +72,11 @@ function ProductContent() {
 
   const product = getProduct(slug)!;
   const { dateRange } = useDateRange();
-  // Only fetch GA metrics when the product has a GA property configured
-  const hasGA = !!product.gaPropertyId;
+  // Only fetch GA metrics when the product has GA configured
   const { data, loading, error, cached, cachedAt } = useMetrics(
     slug as ProductSlug,
-    hasGA ? dateRange.start : "",
-    hasGA ? dateRange.end : ""
+    product.hasGAMetrics ? dateRange.start : "",
+    product.hasGAMetrics ? dateRange.end : ""
   );
 
   // Conditionally fetch ULink business metrics
@@ -128,7 +127,7 @@ function ProductContent() {
       </div>
 
       {/* GA Analytics Section — skip when no GA property */}
-      {product.gaPropertyId && (
+      {product.hasGAMetrics && (
         <>
           <ChartErrorBoundary fallbackMessage="Failed to load KPIs">
             <KPIGrid kpis={data?.kpis || emptyKPIs} loading={loading} />

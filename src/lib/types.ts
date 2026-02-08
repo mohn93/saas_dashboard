@@ -5,6 +5,7 @@ export interface ProductConfig {
   name: string;
   color: string;
   gaPropertyId: string;
+  hasGAMetrics: boolean;
   hasBusinessMetrics: boolean;
   hasSomaraMetrics: boolean;
 }

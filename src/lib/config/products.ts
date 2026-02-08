@@ -6,6 +6,7 @@ export const products: ProductConfig[] = [
     name: "Somara",
     color: "#6366f1", // indigo
     gaPropertyId: process.env.GA_PROPERTY_ID_SOMARA || "",
+    hasGAMetrics: false,
     hasBusinessMetrics: false,
     hasSomaraMetrics: true,
   },
@@ -14,6 +15,7 @@ export const products: ProductConfig[] = [
     name: "ULink",
     color: "#f59e0b", // amber
     gaPropertyId: process.env.GA_PROPERTY_ID_ULINK || "",
+    hasGAMetrics: true,
     hasBusinessMetrics: true,
     hasSomaraMetrics: false,
   },
@@ -22,6 +24,7 @@ export const products: ProductConfig[] = [
     name: "PushFire",
     color: "#ef4444", // red
     gaPropertyId: process.env.GA_PROPERTY_ID_PUSHFIRE || "",
+    hasGAMetrics: true,
     hasBusinessMetrics: false,
     hasSomaraMetrics: false,
   },
