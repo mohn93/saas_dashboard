@@ -1,26 +1,117 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 230 21% 11%;
+    --foreground: 210 40% 98%;
+    --card: 230 21% 13%;
+    --card-foreground: 210 40% 98%;
+    --popover: 230 21% 13%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 252 87% 67%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 230 21% 18%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 230 16% 20%;
+    --muted-foreground: 217 15% 55%;
+    --accent: 230 21% 18%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 230 16% 20%;
+    --input: 230 16% 22%;
+    --ring: 252 87% 67%;
+    --radius: 0.75rem;
+
+    /* Chart accent colors */
+    --chart-indigo: 252 87% 67%;
+    --chart-amber: 38 95% 60%;
+    --chart-red: 0 90% 65%;
+    --chart-emerald: 160 84% 50%;
+    --chart-cyan: 190 95% 60%;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+/* ===== Tremor dark theme overrides ===== */
+
+/* Grid lines */
+.recharts-cartesian-grid line {
+  stroke: hsl(230 16% 20%) !important;
+}
+
+/* Axis text */
+.recharts-text {
+  fill: hsl(217 15% 55%) !important;
+}
+
+/* Axis lines */
+.recharts-cartesian-axis-line,
+.recharts-cartesian-axis-tick-line {
+  stroke: hsl(230 16% 20%) !important;
+}
+
+/* Tooltip */
+.tremor-Tooltip-root,
+.recharts-tooltip-wrapper .recharts-default-tooltip,
+[class*="tremor-"] [role="tooltip"],
+.tremor-content {
+  background-color: hsl(230 21% 16%) !important;
+  border-color: hsl(230 16% 24%) !important;
+  color: hsl(210 40% 98%) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+.recharts-tooltip-item {
+  color: hsl(210 40% 98%) !important;
+}
+.recharts-tooltip-label {
+  color: hsl(217 15% 55%) !important;
+}
+
+/* Legend text */
+[class*="tremor-Legend"],
+.tremor-Legend-legendItem,
+button[class*="tremor-Legend"] {
+  color: hsl(217 15% 55%) !important;
+}
+[class*="tremor-Legend"] span,
+[class*="tremor-Legend"] p,
+[class*="tremor-Legend"] button {
+  color: hsl(210 40% 90%) !important;
+}
+
+/* DonutChart / PieChart label text */
+.recharts-pie-label-text {
+  fill: hsl(210 40% 90%) !important;
+}
+.recharts-sector {
+  stroke: hsl(230 21% 13%) !important;
+}
+
+/* Bar chart bar borders */
+.recharts-bar-rectangle path {
+  stroke: none !important;
+}
+
+/* Tremor internal backgrounds - force transparent */
+[class*="tremor-BarChart"] > div,
+[class*="tremor-DonutChart"] > div,
+[class*="tremor-AreaChart"] > div {
+  background-color: transparent !important;
+}
+
+/* Glow effects for chart areas */
+.tremor-AreaChart-root .recharts-area-area {
+  filter: saturate(1.3);
 }
