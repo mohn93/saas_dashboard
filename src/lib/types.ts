@@ -8,6 +8,7 @@ export interface ProductConfig {
   hasGAMetrics: boolean;
   hasBusinessMetrics: boolean;
   hasSomaraMetrics: boolean;
+  hasPushFireMetrics: boolean;
 }
 
 export interface DateRange {
@@ -197,4 +198,51 @@ export interface SomaraMetrics {
   businessKpis: SomaraBusinessKPIs;
   subscriptionsOverTime: DailySubscriptions[];
   creditPurchasesOverTime: DailyCreditPurchases[];
+}
+
+// PushFire Platform Metrics
+
+export interface PushFireKPIs {
+  totalUsers: number;
+  totalProjects: number;
+  totalSubscribers: number;
+  totalDevices: number;
+  notificationsSent: number;
+  deliverySuccessRate: number; // 0-1
+}
+
+export interface PushFireBusinessKPIs {
+  mrr: number;
+  paidProjects: number;
+  signupToPaidRate: number; // 0-1
+}
+
+export interface DailyNewSubscribers {
+  date: string;
+  count: number;
+}
+
+export interface DailyNotifications {
+  date: string;
+  push: number;
+  email: number;
+}
+
+export interface DailyExecutions {
+  date: string;
+  executions: number;
+}
+
+export interface DeviceOSBreakdown {
+  os: string;
+  count: number;
+}
+
+export interface PushFireMetrics {
+  kpis: PushFireKPIs;
+  businessKpis: PushFireBusinessKPIs;
+  subscribersOverTime: DailyNewSubscribers[];
+  notificationsOverTime: DailyNotifications[];
+  executionsOverTime: DailyExecutions[];
+  deviceBreakdown: DeviceOSBreakdown[];
 }

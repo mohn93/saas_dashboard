@@ -8,6 +8,7 @@ import { useMetrics } from "@/hooks/use-metrics";
 import { useULinkMetrics } from "@/hooks/use-ulink-metrics";
 import { useULinkHealth } from "@/hooks/use-ulink-health";
 import { useSomaraMetrics } from "@/hooks/use-somara-metrics";
+import { usePushFireMetrics } from "@/hooks/use-pushfire-metrics";
 import { KPIGrid } from "@/components/dashboard/kpi-grid";
 import { BusinessKPIGrid } from "@/components/dashboard/business-kpi-grid";
 import { HealthKPIGrid } from "@/components/dashboard/health-kpi-grid";
@@ -24,6 +25,12 @@ import { SomaraKPIGrid } from "@/components/dashboard/somara-kpi-grid";
 import { SomaraBusinessKPIGrid } from "@/components/dashboard/somara-business-kpi-grid";
 import { SubscriptionsChart } from "@/components/charts/subscriptions-chart";
 import { CreditPurchasesChart } from "@/components/charts/credit-purchases-chart";
+import { PushFireKPIGrid } from "@/components/dashboard/pushfire-kpi-grid";
+import { PushFireBusinessKPIGrid } from "@/components/dashboard/pushfire-business-kpi-grid";
+import { SubscribersOverTimeChart } from "@/components/charts/subscribers-over-time-chart";
+import { NotificationsChart } from "@/components/charts/notifications-chart";
+import { ExecutionsChart } from "@/components/charts/executions-chart";
+import { DeviceOSChart } from "@/components/charts/device-os-chart";
 import { ActivityChart } from "@/components/charts/activity-chart";
 import { TokenUsageChart } from "@/components/charts/token-usage-chart";
 import { OrgBillingChart } from "@/components/charts/org-billing-chart";
@@ -71,6 +78,21 @@ const emptySomaraBusinessKPIs = {
   signupToPaidRate: 0,
 };
 
+const emptyPushFireKPIs = {
+  totalUsers: 0,
+  totalProjects: 0,
+  totalSubscribers: 0,
+  totalDevices: 0,
+  notificationsSent: 0,
+  deliverySuccessRate: 0,
+};
+
+const emptyPushFireBusinessKPIs = {
+  mrr: 0,
+  paidProjects: 0,
+  signupToPaidRate: 0,
+};
+
 function ProductContent() {
   const params = useParams();
   const slug = params.product as string;
@@ -104,6 +126,12 @@ function ProductContent() {
   const somaraMetrics = useSomaraMetrics(
     product.hasSomaraMetrics ? dateRange.start : "",
     product.hasSomaraMetrics ? dateRange.end : ""
+  );
+
+  // Conditionally fetch PushFire platform metrics
+  const pushfireMetrics = usePushFireMetrics(
+    product.hasPushFireMetrics ? dateRange.start : "",
+    product.hasPushFireMetrics ? dateRange.end : ""
   );
 
   const emptyKPIs = {
@@ -298,6 +326,83 @@ function ProductContent() {
               />
             </ChartErrorBoundary>
           </div>
+        </>
+      )}
+
+      {/* PushFire Platform Metrics Section */}
+      {product.hasPushFireMetrics && (
+        <>
+          <Separator />
+
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              Platform Metrics
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Usage and engagement data for {product.name}
+            </p>
+          </div>
+
+          <ChartErrorBoundary fallbackMessage="Failed to load PushFire KPIs">
+            <PushFireKPIGrid
+              kpis={pushfireMetrics.data?.kpis || emptyPushFireKPIs}
+              loading={pushfireMetrics.loading}
+            />
+          </ChartErrorBoundary>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ChartErrorBoundary fallbackMessage="Failed to load subscribers chart">
+              <SubscribersOverTimeChart
+                data={pushfireMetrics.data?.subscribersOverTime || []}
+                loading={pushfireMetrics.loading}
+                error={pushfireMetrics.error}
+              />
+            </ChartErrorBoundary>
+
+            <ChartErrorBoundary fallbackMessage="Failed to load notifications chart">
+              <NotificationsChart
+                data={pushfireMetrics.data?.notificationsOverTime || []}
+                loading={pushfireMetrics.loading}
+                error={pushfireMetrics.error}
+              />
+            </ChartErrorBoundary>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ChartErrorBoundary fallbackMessage="Failed to load executions chart">
+              <ExecutionsChart
+                data={pushfireMetrics.data?.executionsOverTime || []}
+                loading={pushfireMetrics.loading}
+                error={pushfireMetrics.error}
+              />
+            </ChartErrorBoundary>
+
+            <ChartErrorBoundary fallbackMessage="Failed to load device breakdown">
+              <DeviceOSChart
+                data={pushfireMetrics.data?.deviceBreakdown || []}
+                loading={pushfireMetrics.loading}
+                error={pushfireMetrics.error}
+              />
+            </ChartErrorBoundary>
+          </div>
+
+          <Separator />
+
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              Business Metrics
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Revenue and conversion data for {product.name}
+            </p>
+          </div>
+
+          <ChartErrorBoundary fallbackMessage="Failed to load PushFire business KPIs">
+            <PushFireBusinessKPIGrid
+              kpis={pushfireMetrics.data?.businessKpis || emptyPushFireBusinessKPIs}
+              loading={pushfireMetrics.loading}
+            />
+          </ChartErrorBoundary>
         </>
       )}
 

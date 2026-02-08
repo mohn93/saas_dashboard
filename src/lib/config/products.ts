@@ -9,6 +9,7 @@ export const products: ProductConfig[] = [
     hasGAMetrics: false,
     hasBusinessMetrics: false,
     hasSomaraMetrics: true,
+    hasPushFireMetrics: false,
   },
   {
     slug: "ulink",
@@ -18,15 +19,17 @@ export const products: ProductConfig[] = [
     hasGAMetrics: true,
     hasBusinessMetrics: true,
     hasSomaraMetrics: false,
+    hasPushFireMetrics: false,
   },
   {
     slug: "pushfire",
     name: "PushFire",
     color: "#ef4444", // red
     gaPropertyId: process.env.GA_PROPERTY_ID_PUSHFIRE || "",
-    hasGAMetrics: true,
+    hasGAMetrics: false,
     hasBusinessMetrics: false,
     hasSomaraMetrics: false,
+    hasPushFireMetrics: true,
   },
 ];
 
