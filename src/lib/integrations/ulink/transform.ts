@@ -7,26 +7,12 @@ import type {
 import type { RawSignupRow, RawSubscriptionRow } from "./queries";
 
 /**
- * Determine if a subscription is on yearly billing by checking
- * the period length (> 60 days = yearly).
- */
-function isYearlyBilling(sub: RawSubscriptionRow): boolean {
-  const start = new Date(sub.current_period_start).getTime();
-  const end = new Date(sub.current_period_end).getTime();
-  const daysDiff = (end - start) / (1000 * 60 * 60 * 24);
-  return daysDiff > 60;
-}
-
-/**
  * Calculate MRR from active subscriptions.
- * Monthly plans: use price_monthly directly.
- * Yearly plans: price_yearly / 12.
+ * Always use price_monthly (the plan's monthly rate) regardless of
+ * billing interval — MRR reflects recurring value at list rate.
  */
 function calculateMRR(subscriptions: RawSubscriptionRow[]): number {
   return subscriptions.reduce((sum, sub) => {
-    if (isYearlyBilling(sub) && sub.price_yearly != null) {
-      return sum + sub.price_yearly / 12;
-    }
     return sum + (sub.price_monthly || 0);
   }, 0);
 }
