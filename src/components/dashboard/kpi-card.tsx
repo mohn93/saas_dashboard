@@ -48,6 +48,8 @@ function formatValue(value: number, type: FormatType): string {
 const defaultIconMap: Record<string, LucideIcon> = {
   "Total Users": Users,
   "New Users": UserPlus,
+  "Total Visitors": Users,
+  "New Visitors": UserPlus,
   Sessions: MousePointerClick,
   Pageviews: Eye,
   "Avg. Duration": Clock,
@@ -60,6 +62,8 @@ const defaultIconMap: Record<string, LucideIcon> = {
 const defaultColorMap: Record<string, string> = {
   "Total Users": "#818cf8",
   "New Users": "#34d399",
+  "Total Visitors": "#818cf8",
+  "New Visitors": "#34d399",
   Sessions: "#60a5fa",
   Pageviews: "#a78bfa",
   "Avg. Duration": "#fbbf24",

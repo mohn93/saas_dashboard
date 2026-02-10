@@ -7,6 +7,7 @@ import { useDateRange } from "@/hooks/use-date-range";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useULinkMetrics } from "@/hooks/use-ulink-metrics";
 import { useULinkHealth } from "@/hooks/use-ulink-health";
+import { useULinkWebsiteMetrics } from "@/hooks/use-ulink-website-metrics";
 import { useSomaraMetrics } from "@/hooks/use-somara-metrics";
 import { usePushFireMetrics } from "@/hooks/use-pushfire-metrics";
 import { KPIGrid } from "@/components/dashboard/kpi-grid";
@@ -122,6 +123,13 @@ function ProductContent() {
     product.hasBusinessMetrics ? dateRange.end : ""
   );
 
+  // Conditionally fetch ULink website-only GA metrics (excludes /dashboard/* routes)
+  const isULink = slug === "ulink";
+  const ulinkWebsite = useULinkWebsiteMetrics(
+    isULink ? dateRange.start : "",
+    isULink ? dateRange.end : ""
+  );
+
   // Conditionally fetch Somara platform metrics
   const somaraMetrics = useSomaraMetrics(
     product.hasSomaraMetrics ? dateRange.start : "",
@@ -160,11 +168,76 @@ function ProductContent() {
             </p>
           </div>
         </div>
-        <CacheIndicator cached={cached} cachedAt={cachedAt} />
+        <CacheIndicator
+          cached={isULink ? ulinkWebsite.cached : cached}
+          cachedAt={isULink ? ulinkWebsite.cachedAt : cachedAt}
+        />
       </div>
 
-      {/* GA Analytics Section — skip when no GA property */}
-      {product.hasGAMetrics && (
+      {/* ULink Website Visitors Section — filtered GA data (excludes /dashboard/*) */}
+      {isULink && (
+        <>
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              Website Visitors
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Public website traffic only (excludes dashboard/app pages)
+            </p>
+          </div>
+
+          <ChartErrorBoundary fallbackMessage="Failed to load KPIs">
+            <KPIGrid kpis={ulinkWebsite.data?.kpis || emptyKPIs} loading={ulinkWebsite.loading} visitorLabels />
+          </ChartErrorBoundary>
+
+          <ChartErrorBoundary fallbackMessage="Failed to load visitors chart">
+            <VisitorsLineChart
+              data={ulinkWebsite.data?.visitorsOverTime || []}
+              loading={ulinkWebsite.loading}
+              error={ulinkWebsite.error}
+            />
+          </ChartErrorBoundary>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ChartErrorBoundary fallbackMessage="Failed to load top pages">
+              <TopPagesTable
+                data={ulinkWebsite.data?.topPages || []}
+                loading={ulinkWebsite.loading}
+                error={ulinkWebsite.error}
+              />
+            </ChartErrorBoundary>
+
+            <ChartErrorBoundary fallbackMessage="Failed to load referrers">
+              <ReferrersTable
+                data={ulinkWebsite.data?.referrers || []}
+                loading={ulinkWebsite.loading}
+                error={ulinkWebsite.error}
+              />
+            </ChartErrorBoundary>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ChartErrorBoundary fallbackMessage="Failed to load country breakdown">
+              <CountryBreakdown
+                data={ulinkWebsite.data?.countries || []}
+                loading={ulinkWebsite.loading}
+                error={ulinkWebsite.error}
+              />
+            </ChartErrorBoundary>
+
+            <ChartErrorBoundary fallbackMessage="Failed to load device breakdown">
+              <DeviceBreakdown
+                data={ulinkWebsite.data?.devices || []}
+                loading={ulinkWebsite.loading}
+                error={ulinkWebsite.error}
+              />
+            </ChartErrorBoundary>
+          </div>
+        </>
+      )}
+
+      {/* GA Analytics Section — for non-ULink products with GA */}
+      {product.hasGAMetrics && !isULink && (
         <>
           <ChartErrorBoundary fallbackMessage="Failed to load KPIs">
             <KPIGrid kpis={data?.kpis || emptyKPIs} loading={loading} />

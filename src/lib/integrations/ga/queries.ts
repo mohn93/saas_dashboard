@@ -5,7 +5,9 @@ function dateRangeToGA(range: DateRange) {
   return [{ startDate: range.start, endDate: range.end }];
 }
 
-export async function fetchKPIs(propertyId: string, range: DateRange) {
+type GADimensionFilter = Record<string, unknown>;
+
+export async function fetchKPIs(propertyId: string, range: DateRange, dimensionFilter?: GADimensionFilter) {
   const client = getGAClient();
   const [response] = await client.runReport({
     property: `properties/${propertyId}`,
@@ -18,13 +20,15 @@ export async function fetchKPIs(propertyId: string, range: DateRange) {
       { name: "averageSessionDuration" },
       { name: "bounceRate" },
     ],
+    ...(dimensionFilter && { dimensionFilter }),
   });
   return response;
 }
 
 export async function fetchVisitorsOverTime(
   propertyId: string,
-  range: DateRange
+  range: DateRange,
+  dimensionFilter?: GADimensionFilter
 ) {
   const client = getGAClient();
   const [response] = await client.runReport({
@@ -37,11 +41,12 @@ export async function fetchVisitorsOverTime(
       { name: "sessions" },
     ],
     orderBys: [{ dimension: { dimensionName: "date", orderType: "ALPHANUMERIC" } }],
+    ...(dimensionFilter && { dimensionFilter }),
   });
   return response;
 }
 
-export async function fetchTopPages(propertyId: string, range: DateRange) {
+export async function fetchTopPages(propertyId: string, range: DateRange, dimensionFilter?: GADimensionFilter) {
   const client = getGAClient();
   const [response] = await client.runReport({
     property: `properties/${propertyId}`,
@@ -50,11 +55,12 @@ export async function fetchTopPages(propertyId: string, range: DateRange) {
     metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }],
     orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
     limit: 20,
+    ...(dimensionFilter && { dimensionFilter }),
   });
   return response;
 }
 
-export async function fetchReferrers(propertyId: string, range: DateRange) {
+export async function fetchReferrers(propertyId: string, range: DateRange, dimensionFilter?: GADimensionFilter) {
   const client = getGAClient();
   const [response] = await client.runReport({
     property: `properties/${propertyId}`,
@@ -63,13 +69,15 @@ export async function fetchReferrers(propertyId: string, range: DateRange) {
     metrics: [{ name: "sessions" }, { name: "totalUsers" }],
     orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
     limit: 20,
+    ...(dimensionFilter && { dimensionFilter }),
   });
   return response;
 }
 
 export async function fetchCountryBreakdown(
   propertyId: string,
-  range: DateRange
+  range: DateRange,
+  dimensionFilter?: GADimensionFilter
 ) {
   const client = getGAClient();
   const [response] = await client.runReport({
@@ -79,13 +87,15 @@ export async function fetchCountryBreakdown(
     metrics: [{ name: "totalUsers" }],
     orderBys: [{ metric: { metricName: "totalUsers" }, desc: true }],
     limit: 15,
+    ...(dimensionFilter && { dimensionFilter }),
   });
   return response;
 }
 
 export async function fetchDeviceBreakdown(
   propertyId: string,
-  range: DateRange
+  range: DateRange,
+  dimensionFilter?: GADimensionFilter
 ) {
   const client = getGAClient();
   const [response] = await client.runReport({
@@ -94,6 +104,7 @@ export async function fetchDeviceBreakdown(
     dimensions: [{ name: "deviceCategory" }],
     metrics: [{ name: "totalUsers" }],
     orderBys: [{ metric: { metricName: "totalUsers" }, desc: true }],
+    ...(dimensionFilter && { dimensionFilter }),
   });
   return response;
 }

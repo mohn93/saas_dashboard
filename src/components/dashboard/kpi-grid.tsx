@@ -6,13 +6,17 @@ import type { KPIs } from "@/lib/types";
 interface KPIGridProps {
   kpis: KPIs;
   loading?: boolean;
+  visitorLabels?: boolean;
 }
 
-export function KPIGrid({ kpis, loading }: KPIGridProps) {
+export function KPIGrid({ kpis, loading, visitorLabels }: KPIGridProps) {
+  const userLabel = visitorLabels ? "Total Visitors" : "Total Users";
+  const newUserLabel = visitorLabels ? "New Visitors" : "New Users";
+
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-      <KPICard label="Total Users" value={kpis.totalUsers} loading={loading} />
-      <KPICard label="New Users" value={kpis.newUsers} loading={loading} />
+      <KPICard label={userLabel} value={kpis.totalUsers} loading={loading} />
+      <KPICard label={newUserLabel} value={kpis.newUsers} loading={loading} />
       <KPICard label="Sessions" value={kpis.sessions} loading={loading} />
       <KPICard label="Pageviews" value={kpis.pageviews} loading={loading} />
       <KPICard
