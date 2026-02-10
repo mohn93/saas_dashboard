@@ -120,6 +120,44 @@ export async function fetchMRROverTime(
   }));
 }
 
+/**
+ * Count distinct projects with activity (link created, link clicked, or SDK session)
+ * within the date range.
+ */
+export async function fetchActiveProjects(
+  startDate: Date,
+  endDate: Date
+): Promise<number> {
+  const supabase = getULinkClient();
+  const start = startDate.toISOString();
+  const end = endDate.toISOString();
+
+  // Projects that created links in the period
+  const { data: linkProjects } = await supabase
+    .from("links")
+    .select("project_id")
+    .gte("created_at", start)
+    .lte("created_at", end);
+
+  // Projects with SDK sessions in the period
+  const { data: sessionProjects } = await supabase
+    .from("user_sessions")
+    .select("project_id")
+    .gte("session_start", start)
+    .lte("session_start", end);
+
+  // Combine distinct project IDs
+  const projectIds = new Set<string>();
+  for (const row of linkProjects || []) {
+    projectIds.add(row.project_id);
+  }
+  for (const row of sessionProjects || []) {
+    projectIds.add(row.project_id);
+  }
+
+  return projectIds.size;
+}
+
 // Phase 3: Client Health
 
 export interface RawProjectHealth {

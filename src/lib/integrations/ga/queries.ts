@@ -25,6 +25,29 @@ export async function fetchKPIs(propertyId: string, range: DateRange, dimensionF
   return response;
 }
 
+/**
+ * Fetches KPIs with `activeUsers` in place of `newUsers`.
+ * Use this when a pagePath filter makes `newUsers` meaningless
+ * (GA4 only counts users whose first_visit matched the filter).
+ */
+export async function fetchDashboardKPIs(propertyId: string, range: DateRange, dimensionFilter?: GADimensionFilter) {
+  const client = getGAClient();
+  const [response] = await client.runReport({
+    property: `properties/${propertyId}`,
+    dateRanges: dateRangeToGA(range),
+    metrics: [
+      { name: "totalUsers" },
+      { name: "activeUsers" },
+      { name: "sessions" },
+      { name: "screenPageViews" },
+      { name: "averageSessionDuration" },
+      { name: "bounceRate" },
+    ],
+    ...(dimensionFilter && { dimensionFilter }),
+  });
+  return response;
+}
+
 export async function fetchVisitorsOverTime(
   propertyId: string,
   range: DateRange,
@@ -45,6 +68,7 @@ export async function fetchVisitorsOverTime(
   });
   return response;
 }
+
 
 export async function fetchTopPages(propertyId: string, range: DateRange, dimensionFilter?: GADimensionFilter) {
   const client = getGAClient();

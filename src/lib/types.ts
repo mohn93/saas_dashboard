@@ -89,6 +89,7 @@ export interface ULinkBusinessMetrics {
   mrr: number;
   totalSignups: number;
   totalPaidUsers: number;
+  activeProjects: number;
   visitorToSignupRate: number;
   signupToPaidRate: number;
   signupsOverTime: DailySignups[];

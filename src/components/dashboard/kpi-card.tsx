@@ -11,6 +11,9 @@ import {
   TrendingDown,
   DollarSign,
   ArrowRightLeft,
+  Globe,
+  CreditCard,
+  FolderKanban,
   type LucideIcon,
 } from "lucide-react";
 
@@ -57,6 +60,10 @@ const defaultIconMap: Record<string, LucideIcon> = {
   MRR: DollarSign,
   "Visitor → Signup": ArrowRightLeft,
   "Signup → Paid": ArrowRightLeft,
+  "Website Visitors": Globe,
+  Signups: UserPlus,
+  "Active Projects": FolderKanban,
+  "Paying Customers": CreditCard,
 };
 
 const defaultColorMap: Record<string, string> = {
@@ -71,6 +78,10 @@ const defaultColorMap: Record<string, string> = {
   MRR: "#34d399",
   "Visitor → Signup": "#60a5fa",
   "Signup → Paid": "#a78bfa",
+  "Website Visitors": "#818cf8",
+  Signups: "#34d399",
+  "Active Projects": "#60a5fa",
+  "Paying Customers": "#fbbf24",
 };
 
 export function KPICard({

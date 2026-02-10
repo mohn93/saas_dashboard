@@ -184,6 +184,7 @@ export function transformBusinessMetrics(params: {
   totalSignups: number;
   subscriptions: RawSubscriptionRow[];
   totalPaidUsers: number;
+  activeProjects: number;
   mrrOverTime: { date: string; mrr: number }[];
   gaVisitors: number;
   startDate: Date;
@@ -204,6 +205,7 @@ export function transformBusinessMetrics(params: {
     mrr,
     totalSignups: params.totalSignups,
     totalPaidUsers: params.totalPaidUsers,
+    activeProjects: params.activeProjects,
     visitorToSignupRate,
     signupToPaidRate,
     signupsOverTime,

@@ -8,9 +8,11 @@ import { useMetrics } from "@/hooks/use-metrics";
 import { useULinkMetrics } from "@/hooks/use-ulink-metrics";
 import { useULinkHealth } from "@/hooks/use-ulink-health";
 import { useULinkWebsiteMetrics } from "@/hooks/use-ulink-website-metrics";
+import { useULinkDashboardUsers } from "@/hooks/use-ulink-dashboard-users";
 import { useSomaraMetrics } from "@/hooks/use-somara-metrics";
 import { usePushFireMetrics } from "@/hooks/use-pushfire-metrics";
 import { KPIGrid } from "@/components/dashboard/kpi-grid";
+import { FunnelKPIGrid } from "@/components/dashboard/funnel-kpi-grid";
 import { BusinessKPIGrid } from "@/components/dashboard/business-kpi-grid";
 import { HealthKPIGrid } from "@/components/dashboard/health-kpi-grid";
 import { ProjectHealthTable } from "@/components/dashboard/project-health-table";
@@ -47,6 +49,7 @@ const emptyBusinessMetrics: ULinkBusinessMetrics = {
   mrr: 0,
   totalSignups: 0,
   totalPaidUsers: 0,
+  activeProjects: 0,
   visitorToSignupRate: 0,
   signupToPaidRate: 0,
   signupsOverTime: [],
@@ -126,6 +129,12 @@ function ProductContent() {
   // Conditionally fetch ULink website-only GA metrics (excludes /dashboard/* routes)
   const isULink = slug === "ulink";
   const ulinkWebsite = useULinkWebsiteMetrics(
+    isULink ? dateRange.start : "",
+    isULink ? dateRange.end : ""
+  );
+
+  // Conditionally fetch ULink dashboard users GA metrics (only /dashboard/* routes)
+  const ulinkDashboardUsers = useULinkDashboardUsers(
     isULink ? dateRange.start : "",
     isULink ? dateRange.end : ""
   );
@@ -230,6 +239,62 @@ function ProductContent() {
                 data={ulinkWebsite.data?.devices || []}
                 loading={ulinkWebsite.loading}
                 error={ulinkWebsite.error}
+              />
+            </ChartErrorBoundary>
+          </div>
+        </>
+      )}
+
+      {/* ULink Product Users Section — filtered GA data (only /dashboard/*) */}
+      {isULink && (
+        <>
+          <Separator />
+
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              Product Users
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              User funnel and in-app engagement
+            </p>
+          </div>
+
+          <ChartErrorBoundary fallbackMessage="Failed to load funnel KPIs">
+            <FunnelKPIGrid
+              signups={ulinkMetrics.data?.totalSignups ?? 0}
+              activeProjects={ulinkMetrics.data?.activeProjects ?? 0}
+              payingCustomers={ulinkMetrics.data?.totalPaidUsers ?? 0}
+              loading={ulinkMetrics.loading}
+            />
+          </ChartErrorBoundary>
+
+          <ChartErrorBoundary fallbackMessage="Failed to load dashboard user KPIs">
+            <KPIGrid kpis={ulinkDashboardUsers.data?.kpis || emptyKPIs} loading={ulinkDashboardUsers.loading} dashboardLabels />
+          </ChartErrorBoundary>
+
+          <ChartErrorBoundary fallbackMessage="Failed to load dashboard users chart">
+            <VisitorsLineChart
+              data={ulinkDashboardUsers.data?.visitorsOverTime || []}
+              loading={ulinkDashboardUsers.loading}
+              error={ulinkDashboardUsers.error}
+              dashboardMode
+            />
+          </ChartErrorBoundary>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ChartErrorBoundary fallbackMessage="Failed to load dashboard top pages">
+              <TopPagesTable
+                data={ulinkDashboardUsers.data?.topPages || []}
+                loading={ulinkDashboardUsers.loading}
+                error={ulinkDashboardUsers.error}
+              />
+            </ChartErrorBoundary>
+
+            <ChartErrorBoundary fallbackMessage="Failed to load dashboard referrers">
+              <ReferrersTable
+                data={ulinkDashboardUsers.data?.referrers || []}
+                loading={ulinkDashboardUsers.loading}
+                error={ulinkDashboardUsers.error}
               />
             </ChartErrorBoundary>
           </div>

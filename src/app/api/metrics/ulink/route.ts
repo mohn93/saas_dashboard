@@ -6,6 +6,7 @@ import {
   fetchSignups,
   fetchActiveSubscriptions,
   fetchMRROverTime,
+  fetchActiveProjects,
 } from "@/lib/integrations/ulink/queries";
 import { transformBusinessMetrics } from "@/lib/integrations/ulink/transform";
 import {
@@ -56,12 +57,13 @@ export async function GET(
     try {
       const { startDate, endDate } = parseDateRange(start, end);
 
-      const [signupsResult, subsResult, mrrTimeline, gaKpisRaw] =
+      const [signupsResult, subsResult, mrrTimeline, gaKpisRaw, activeProjects] =
         await Promise.all([
           fetchSignups(startDate, endDate),
           fetchActiveSubscriptions(),
           fetchMRROverTime(startDate, endDate),
           fetchKPIs(productConfig.gaPropertyId, { start, end }),
+          fetchActiveProjects(startDate, endDate),
         ]);
 
       const gaKpis = transformKPIs(gaKpisRaw);
@@ -71,6 +73,7 @@ export async function GET(
         totalSignups: signupsResult.total,
         subscriptions: subsResult.subscriptions,
         totalPaidUsers: subsResult.totalPaidUsers,
+        activeProjects,
         mrrOverTime: mrrTimeline,
         gaVisitors: gaKpis.totalUsers,
         startDate,
@@ -118,12 +121,13 @@ export async function GET(
     try {
       const { startDate, endDate } = parseDateRange(start, end);
 
-      const [signupsResult, subsResult, mrrTimeline, gaKpisRaw] =
+      const [signupsResult, subsResult, mrrTimeline, gaKpisRaw, activeProjects] =
         await Promise.all([
           fetchSignups(startDate, endDate),
           fetchActiveSubscriptions(),
           fetchMRROverTime(startDate, endDate),
           fetchKPIs(productConfig.gaPropertyId, { start, end }),
+          fetchActiveProjects(startDate, endDate),
         ]);
 
       const gaKpis = transformKPIs(gaKpisRaw);
@@ -133,6 +137,7 @@ export async function GET(
         totalSignups: signupsResult.total,
         subscriptions: subsResult.subscriptions,
         totalPaidUsers: subsResult.totalPaidUsers,
+        activeProjects,
         mrrOverTime: mrrTimeline,
         gaVisitors: gaKpis.totalUsers,
         startDate,
