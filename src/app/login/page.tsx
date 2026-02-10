@@ -4,7 +4,8 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { siteConfig } from "@/lib/config/site";
-import { createClient } from "@/lib/supabase/browser";
+import { getFirebaseAuth } from "@/lib/firebase/client";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -21,14 +22,20 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const auth = getFirebaseAuth();
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await credential.user.getIdToken();
+
+      // Exchange ID token for session cookie via API route
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
       });
 
-      if (signInError) {
-        setError(signInError.message);
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Sign in failed");
         return;
       }
 
@@ -36,7 +43,7 @@ function LoginForm() {
       router.push(from);
       router.refresh();
     } catch {
-      setError("Something went wrong");
+      setError("Invalid email or password");
     } finally {
       setLoading(false);
     }

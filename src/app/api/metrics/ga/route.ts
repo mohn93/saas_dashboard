@@ -20,7 +20,7 @@ import {
 import {
   getCachedMetrics,
   setCachedMetrics,
-} from "@/lib/integrations/supabase/cache";
+} from "@/lib/cache/kv";
 import type { ApiResponse, GAMetricsBundle, DateRange } from "@/lib/types";
 
 export async function GET(

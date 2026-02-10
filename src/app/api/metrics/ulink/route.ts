@@ -11,7 +11,7 @@ import { transformBusinessMetrics } from "@/lib/integrations/ulink/transform";
 import {
   getCachedMetrics,
   setCachedMetrics,
-} from "@/lib/integrations/supabase/cache";
+} from "@/lib/cache/kv";
 import { parseDateRange } from "@/lib/utils/dates";
 import type { ApiResponse, ULinkBusinessMetrics } from "@/lib/types";
 

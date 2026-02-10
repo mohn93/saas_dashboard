@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getAdminAuth } from "@/lib/firebase/admin";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,48 +27,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
-    );
-
     // Check if email is in the allowlist
-    const { data: allowed, error: allowError } = await supabaseAdmin
-      .from("allowed_users")
-      .select("id")
-      .eq("email", email.toLowerCase())
-      .single();
+    const allowedEmails = (process.env.ALLOWED_EMAILS || "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
 
-    if (allowError || !allowed) {
+    if (!allowedEmails.includes(email.toLowerCase())) {
       return NextResponse.json(
         { error: "This email is not authorized to sign up" },
         { status: 403 }
       );
     }
 
-    // Create user with auto-confirm (no email verification needed)
-    const { error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email: email.toLowerCase(),
-      password,
-      email_confirm: true,
-    });
+    // Create user with Firebase Admin
+    const auth = getAdminAuth();
 
-    if (createError) {
-      if (createError.message.includes("already been registered")) {
+    try {
+      await auth.createUser({
+        email: email.toLowerCase(),
+        password,
+        emailVerified: true,
+      });
+    } catch (createError: unknown) {
+      const errorMessage =
+        createError instanceof Error ? createError.message : String(createError);
+      if (errorMessage.includes("already exists")) {
         return NextResponse.json(
           { error: "An account with this email already exists" },
           { status: 409 }
         );
       }
       return NextResponse.json(
-        { error: createError.message },
+        { error: errorMessage },
         { status: 400 }
       );
     }
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error("Signup error:", err);
     return NextResponse.json(
       { error: "Invalid request" },
       { status: 400 }

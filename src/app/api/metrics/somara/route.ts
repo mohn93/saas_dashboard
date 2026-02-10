@@ -15,7 +15,7 @@ import { transformSomaraMetrics } from "@/lib/integrations/somara/transform";
 import {
   getCachedMetrics,
   setCachedMetrics,
-} from "@/lib/integrations/supabase/cache";
+} from "@/lib/cache/kv";
 import { parseDateRange } from "@/lib/utils/dates";
 import type { ApiResponse, SomaraMetrics } from "@/lib/types";
 
