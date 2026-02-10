@@ -22,15 +22,27 @@ import {
 } from "@/lib/cache/kv";
 import type { ApiResponse, GAMetricsBundle, DateRange } from "@/lib/types";
 
+const EXCLUDED_PATHS = [
+  "/dashboard",
+  "/onboarding",
+  "/auth/cli",
+  "/signup/success",
+  "/auth/verification-success",
+];
+
 const WEBSITE_FILTER = {
-  notExpression: {
-    filter: {
-      fieldName: "pagePath",
-      stringFilter: {
-        matchType: "BEGINS_WITH",
-        value: "/dashboard",
+  andGroup: {
+    expressions: EXCLUDED_PATHS.map((path) => ({
+      notExpression: {
+        filter: {
+          fieldName: "pagePath",
+          stringFilter: {
+            matchType: "BEGINS_WITH",
+            value: path,
+          },
+        },
       },
-    },
+    })),
   },
 };
 
