@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import { products } from "@/lib/config/products";
 import { useDateRange } from "@/hooks/use-date-range";
 import { useMetrics } from "@/hooks/use-metrics";
-import { useSomaraMetrics } from "@/hooks/use-somara-metrics";
 import { usePushFireMetrics } from "@/hooks/use-pushfire-metrics";
 import { CacheIndicator } from "@/components/dashboard/cache-indicator";
 import { ChartErrorBoundary } from "@/components/dashboard/error-boundary";
@@ -14,7 +13,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Users,
   Bell,
-  MessageSquare,
   MousePointerClick,
 } from "lucide-react";
 import Link from "next/link";
@@ -24,25 +22,21 @@ function OverviewContent() {
 
   // ULink — GA metrics
   const ulink = useMetrics("ulink", dateRange.start, dateRange.end);
-  // Somara — platform DB metrics
-  const somara = useSomaraMetrics(dateRange.start, dateRange.end);
   // PushFire — platform DB metrics
   const pushfire = usePushFireMetrics(dateRange.start, dateRange.end);
 
-  const loading = ulink.loading || somara.loading || pushfire.loading;
+  const loading = ulink.loading || pushfire.loading;
 
   // Aggregate cross-product KPIs from each data source
   const totalUsers =
     (ulink.data?.kpis.totalUsers || 0) +
-    (somara.data?.kpis.totalUsers || 0) +
     (pushfire.data?.kpis.totalUsers || 0);
 
   const totalSessions = ulink.data?.kpis.sessions || 0;
-  const totalMessages = somara.data?.kpis.totalMessages || 0;
   const totalNotifications = pushfire.data?.kpis.notificationsSent || 0;
 
   // Find first cached response for indicator
-  const cachedEntry = [ulink, somara, pushfire].find((m) => m.cached);
+  const cachedEntry = [ulink, pushfire].find((m) => m.cached);
 
   return (
     <div className="space-y-6">
@@ -62,7 +56,7 @@ function OverviewContent() {
       </div>
 
       <ChartErrorBoundary fallbackMessage="Failed to load overview KPIs">
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <KPICard
             label="Total Users"
             value={totalUsers}
@@ -76,13 +70,6 @@ function OverviewContent() {
             loading={loading}
             icon={MousePointerClick}
             accentColor="#f59e0b"
-          />
-          <KPICard
-            label="Messages"
-            value={totalMessages}
-            loading={loading}
-            icon={MessageSquare}
-            accentColor="#6366f1"
           />
           <KPICard
             label="Notifications"
@@ -109,25 +96,9 @@ function OverviewContent() {
               </div>
             </CardHeader>
             <CardContent>
-              {somara.loading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-6 w-20" />
-                  <Skeleton className="h-4 w-32" />
-                </div>
-              ) : somara.error ? (
-                <p className="text-sm text-muted-foreground">Unable to load</p>
-              ) : somara.data ? (
-                <div className="space-y-1">
-                  <p className="text-2xl font-bold tabular-nums">
-                    {somara.data.kpis.totalUsers.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {somara.data.kpis.totalMessages.toLocaleString()} messages
-                    &middot;{" "}
-                    {somara.data.kpis.tokensUsed.toLocaleString()} tokens
-                  </p>
-                </div>
-              ) : null}
+              <p className="text-sm font-medium text-muted-foreground">
+                Coming Soon
+              </p>
             </CardContent>
           </Card>
         </Link>

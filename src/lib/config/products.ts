@@ -8,7 +8,7 @@ export const products: ProductConfig[] = [
     gaPropertyId: process.env.GA_PROPERTY_ID_SOMARA || "",
     hasGAMetrics: false,
     hasBusinessMetrics: false,
-    hasSomaraMetrics: true,
+    hasSomaraMetrics: false,
     hasPushFireMetrics: false,
   },
   {

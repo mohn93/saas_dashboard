@@ -99,7 +99,7 @@ export async function fetchKPIs(
         .gte("created_at", startISO)
         .lte("created_at", endISO),
       // Tokens used in period — use RPC for SUM
-      supabase.rpc("get_somara_tokens_sum", {
+      supabase.rpc("metrics_somara_tokens_sum", {
         start_date: startISO,
         end_date: endISO,
       }),
@@ -107,7 +107,7 @@ export async function fetchKPIs(
 
   // For active users, we need distinct count, so use a different approach
   // The count above counts rows, not distinct users. Use RPC instead.
-  const distinctActiveRes = await supabase.rpc("get_somara_active_users", {
+  const distinctActiveRes = await supabase.rpc("metrics_somara_active_users", {
     start_date: startISO,
     end_date: endISO,
   });
@@ -131,7 +131,7 @@ export async function fetchActivityOverTime(
 ): Promise<RawDailyActivity[]> {
   const supabase = getSomaraClient();
 
-  const { data, error } = await supabase.rpc("get_somara_daily_activity", {
+  const { data, error } = await supabase.rpc("metrics_somara_daily_activity", {
     start_date: startDate.toISOString(),
     end_date: endDate.toISOString(),
   });
@@ -157,7 +157,7 @@ export async function fetchSignupsOverTime(
 ): Promise<RawDailySignup[]> {
   const supabase = getSomaraClient();
 
-  const { data, error } = await supabase.rpc("get_somara_daily_signups", {
+  const { data, error } = await supabase.rpc("metrics_somara_daily_signups", {
     start_date: startDate.toISOString(),
     end_date: endDate.toISOString(),
   });
@@ -182,7 +182,7 @@ export async function fetchTokenUsageOverTime(
 ): Promise<RawDailyTokens[]> {
   const supabase = getSomaraClient();
 
-  const { data, error } = await supabase.rpc("get_somara_daily_tokens", {
+  const { data, error } = await supabase.rpc("metrics_somara_daily_tokens", {
     start_date: startDate.toISOString(),
     end_date: endDate.toISOString(),
   });
@@ -204,7 +204,7 @@ export async function fetchTokenUsageOverTime(
 export async function fetchOrgBillingBreakdown(): Promise<RawOrgBilling[]> {
   const supabase = getSomaraClient();
 
-  const { data, error } = await supabase.rpc("get_somara_org_billing_breakdown");
+  const { data, error } = await supabase.rpc("metrics_somara_org_billing_breakdown");
 
   if (error) {
     console.error("Error fetching Somara org billing breakdown:", error);
@@ -223,7 +223,7 @@ export async function fetchOrgBillingBreakdown(): Promise<RawOrgBilling[]> {
 export async function fetchTopModels(): Promise<RawModelUsage[]> {
   const supabase = getSomaraClient();
 
-  const { data, error } = await supabase.rpc("get_somara_top_models");
+  const { data, error } = await supabase.rpc("metrics_somara_top_models");
 
   if (error) {
     console.error("Error fetching Somara top models:", error);
@@ -243,7 +243,7 @@ export async function fetchTopModels(): Promise<RawModelUsage[]> {
 export async function fetchCreditsOverview(): Promise<RawCredits[]> {
   const supabase = getSomaraClient();
 
-  const { data, error } = await supabase.rpc("get_somara_credits_overview");
+  const { data, error } = await supabase.rpc("metrics_somara_credits_overview");
 
   if (error) {
     console.error("Error fetching Somara credits overview:", error);
@@ -264,7 +264,7 @@ export async function fetchCreditsOverview(): Promise<RawCredits[]> {
 export async function fetchBusinessKPIs(): Promise<RawBusinessKPIs> {
   const supabase = getSomaraClient();
 
-  const { data, error } = await supabase.rpc("get_somara_business_kpis");
+  const { data, error } = await supabase.rpc("metrics_somara_business_kpis");
 
   if (error) {
     console.error("Error fetching Somara business KPIs:", error);
@@ -287,7 +287,7 @@ export async function fetchSubscriptionsOverTime(
 ): Promise<RawDailySubscriptions[]> {
   const supabase = getSomaraClient();
 
-  const { data, error } = await supabase.rpc("get_somara_subscriptions_over_time", {
+  const { data, error } = await supabase.rpc("metrics_somara_subscriptions_over_time", {
     start_date: startDate.toISOString(),
     end_date: endDate.toISOString(),
   });
@@ -312,7 +312,7 @@ export async function fetchCreditPurchasesOverTime(
 ): Promise<RawDailyCreditPurchases[]> {
   const supabase = getSomaraClient();
 
-  const { data, error } = await supabase.rpc("get_somara_credit_purchases_over_time", {
+  const { data, error } = await supabase.rpc("metrics_somara_credit_purchases_over_time", {
     start_date: startDate.toISOString(),
     end_date: endDate.toISOString(),
   });

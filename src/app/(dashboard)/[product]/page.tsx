@@ -9,7 +9,6 @@ import { useULinkMetrics } from "@/hooks/use-ulink-metrics";
 import { useULinkHealth } from "@/hooks/use-ulink-health";
 import { useULinkWebsiteMetrics } from "@/hooks/use-ulink-website-metrics";
 import { useULinkDashboardUsers } from "@/hooks/use-ulink-dashboard-users";
-import { useSomaraMetrics } from "@/hooks/use-somara-metrics";
 import { usePushFireMetrics } from "@/hooks/use-pushfire-metrics";
 import { KPIGrid } from "@/components/dashboard/kpi-grid";
 import { FunnelKPIGrid } from "@/components/dashboard/funnel-kpi-grid";
@@ -24,21 +23,12 @@ import { DeviceBreakdown } from "@/components/charts/device-breakdown";
 import { MRRChart } from "@/components/charts/mrr-chart";
 import { SignupsChart } from "@/components/charts/signups-chart";
 import { HealthStatusChart } from "@/components/charts/health-status-chart";
-import { SomaraKPIGrid } from "@/components/dashboard/somara-kpi-grid";
-import { SomaraBusinessKPIGrid } from "@/components/dashboard/somara-business-kpi-grid";
-import { SubscriptionsChart } from "@/components/charts/subscriptions-chart";
-import { CreditPurchasesChart } from "@/components/charts/credit-purchases-chart";
 import { PushFireKPIGrid } from "@/components/dashboard/pushfire-kpi-grid";
 import { PushFireBusinessKPIGrid } from "@/components/dashboard/pushfire-business-kpi-grid";
 import { SubscribersOverTimeChart } from "@/components/charts/subscribers-over-time-chart";
 import { NotificationsChart } from "@/components/charts/notifications-chart";
 import { ExecutionsChart } from "@/components/charts/executions-chart";
 import { DeviceOSChart } from "@/components/charts/device-os-chart";
-import { ActivityChart } from "@/components/charts/activity-chart";
-import { TokenUsageChart } from "@/components/charts/token-usage-chart";
-import { OrgBillingChart } from "@/components/charts/org-billing-chart";
-import { TopModelsChart } from "@/components/charts/top-models-chart";
-import { CreditsTable } from "@/components/charts/credits-table";
 import { CacheIndicator } from "@/components/dashboard/cache-indicator";
 import { ChartErrorBoundary } from "@/components/dashboard/error-boundary";
 import { Separator } from "@/components/ui/separator";
@@ -65,21 +55,6 @@ const emptyClientHealth: ULinkClientHealth = {
   configuredRate: 0,
   projectsWithLinks: 0,
   projects: [],
-};
-
-const emptySomaraKPIs = {
-  totalUsers: 0,
-  activeUsers: 0,
-  newSignups: 0,
-  totalMessages: 0,
-  totalChats: 0,
-  tokensUsed: 0,
-};
-
-const emptySomaraBusinessKPIs = {
-  activeSubscribers: 0,
-  creditsPurchased: 0,
-  signupToPaidRate: 0,
 };
 
 const emptyPushFireKPIs = {
@@ -137,12 +112,6 @@ function ProductContent() {
   const ulinkDashboardUsers = useULinkDashboardUsers(
     isULink ? dateRange.start : "",
     isULink ? dateRange.end : ""
-  );
-
-  // Conditionally fetch Somara platform metrics
-  const somaraMetrics = useSomaraMetrics(
-    product.hasSomaraMetrics ? dateRange.start : "",
-    product.hasSomaraMetrics ? dateRange.end : ""
   );
 
   // Conditionally fetch PushFire platform metrics
@@ -354,117 +323,16 @@ function ProductContent() {
         </>
       )}
 
-      {/* Somara Platform Metrics Section */}
-      {product.hasSomaraMetrics && (
-        <>
-          <Separator />
-
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">
-              Platform Metrics
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Usage and engagement data for {product.name}
-            </p>
-          </div>
-
-          <ChartErrorBoundary fallbackMessage="Failed to load Somara KPIs">
-            <SomaraKPIGrid
-              kpis={somaraMetrics.data?.kpis || emptySomaraKPIs}
-              loading={somaraMetrics.loading}
-            />
-          </ChartErrorBoundary>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <ChartErrorBoundary fallbackMessage="Failed to load activity chart">
-              <ActivityChart
-                data={somaraMetrics.data?.activityOverTime || []}
-                loading={somaraMetrics.loading}
-                error={somaraMetrics.error}
-              />
-            </ChartErrorBoundary>
-
-            <ChartErrorBoundary fallbackMessage="Failed to load signups chart">
-              <SignupsChart
-                data={somaraMetrics.data?.signupsOverTime || []}
-                loading={somaraMetrics.loading}
-                error={somaraMetrics.error}
-              />
-            </ChartErrorBoundary>
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <ChartErrorBoundary fallbackMessage="Failed to load token usage chart">
-              <TokenUsageChart
-                data={somaraMetrics.data?.tokenUsageOverTime || []}
-                loading={somaraMetrics.loading}
-                error={somaraMetrics.error}
-              />
-            </ChartErrorBoundary>
-
-            <ChartErrorBoundary fallbackMessage="Failed to load billing chart">
-              <OrgBillingChart
-                data={somaraMetrics.data?.orgBillingBreakdown || []}
-                loading={somaraMetrics.loading}
-                error={somaraMetrics.error}
-              />
-            </ChartErrorBoundary>
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <ChartErrorBoundary fallbackMessage="Failed to load top models">
-              <TopModelsChart
-                data={somaraMetrics.data?.topModels || []}
-                loading={somaraMetrics.loading}
-                error={somaraMetrics.error}
-              />
-            </ChartErrorBoundary>
-
-            <ChartErrorBoundary fallbackMessage="Failed to load credits overview">
-              <CreditsTable
-                data={somaraMetrics.data?.creditsOverview || []}
-                loading={somaraMetrics.loading}
-                error={somaraMetrics.error}
-              />
-            </ChartErrorBoundary>
-          </div>
-
-          <Separator />
-
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">
-              Business Metrics
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Subscription health and credit revenue for {product.name}
-            </p>
-          </div>
-
-          <ChartErrorBoundary fallbackMessage="Failed to load business KPIs">
-            <SomaraBusinessKPIGrid
-              kpis={somaraMetrics.data?.businessKpis || emptySomaraBusinessKPIs}
-              loading={somaraMetrics.loading}
-            />
-          </ChartErrorBoundary>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <ChartErrorBoundary fallbackMessage="Failed to load subscriptions chart">
-              <SubscriptionsChart
-                data={somaraMetrics.data?.subscriptionsOverTime || []}
-                loading={somaraMetrics.loading}
-                error={somaraMetrics.error}
-              />
-            </ChartErrorBoundary>
-
-            <ChartErrorBoundary fallbackMessage="Failed to load credit purchases chart">
-              <CreditPurchasesChart
-                data={somaraMetrics.data?.creditPurchasesOverTime || []}
-                loading={somaraMetrics.loading}
-                error={somaraMetrics.error}
-              />
-            </ChartErrorBoundary>
-          </div>
-        </>
+      {/* Somara — Coming Soon */}
+      {slug === "somara" && (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-20">
+          <h2 className="text-xl font-semibold text-muted-foreground">
+            Coming Soon
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Somara analytics will be available in a future update.
+          </p>
+        </div>
       )}
 
       {/* PushFire Platform Metrics Section */}
