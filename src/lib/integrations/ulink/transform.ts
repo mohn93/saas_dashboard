@@ -1,4 +1,4 @@
-import { addDays, format } from "date-fns";
+import { addDays, differenceInDays, format, parseISO } from "date-fns";
 import type {
   ULinkBusinessMetrics,
   DailySignups,
@@ -7,12 +7,30 @@ import type {
 import type { RawSignupRow, RawSubscriptionRow } from "./queries";
 
 /**
+ * Determine if a subscription is on a yearly billing interval
+ * by checking the length of the current billing period.
+ */
+function isYearlySubscription(sub: RawSubscriptionRow): boolean {
+  if (!sub.current_period_start || !sub.current_period_end) return false;
+  const days = differenceInDays(
+    parseISO(sub.current_period_end),
+    parseISO(sub.current_period_start)
+  );
+  // Yearly periods are typically 360-370 days
+  return days > 60;
+}
+
+/**
  * Calculate MRR from active subscriptions.
- * Always use price_monthly (the plan's monthly rate) regardless of
- * billing interval — MRR reflects recurring value at list rate.
+ * Uses the actual price the subscriber pays:
+ * - Monthly subscribers: price_monthly
+ * - Yearly subscribers: price_yearly / 12
  */
 function calculateMRR(subscriptions: RawSubscriptionRow[]): number {
   return subscriptions.reduce((sum, sub) => {
+    if (isYearlySubscription(sub) && sub.price_yearly != null) {
+      return sum + sub.price_yearly / 12;
+    }
     return sum + (sub.price_monthly || 0);
   }, 0);
 }
