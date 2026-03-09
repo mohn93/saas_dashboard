@@ -39,8 +39,8 @@ function formatValue(value: number, type: FormatType): string {
       return `${(value * 100).toFixed(1)}%`;
     case "currency":
       return `$${value.toLocaleString(undefined, {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       })}`;
     case "number":
     default:

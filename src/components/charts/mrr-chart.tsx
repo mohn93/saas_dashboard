@@ -34,8 +34,8 @@ export function MRRChart({ data, loading, error }: MRRChartProps) {
         curveType="monotone"
         valueFormatter={(value) =>
           `$${value.toLocaleString(undefined, {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
           })}`
         }
       />

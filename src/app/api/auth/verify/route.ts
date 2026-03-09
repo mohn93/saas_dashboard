@@ -11,7 +11,8 @@ export async function GET(request: NextRequest) {
   try {
     const decoded = await getAdminAuth().verifySessionCookie(session, true);
     return NextResponse.json({ uid: decoded.uid });
-  } catch {
+  } catch (err) {
+    console.error("Session verify error:", err);
     return NextResponse.json({ error: "Invalid session" }, { status: 401 });
   }
 }

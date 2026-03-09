@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { siteConfig } from "@/lib/config/site";
 import { getFirebaseAuth } from "@/lib/firebase/client";
@@ -12,7 +12,6 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
   const searchParams = useSearchParams();
   const signupSuccess = searchParams.get("signup") === "success";
 
@@ -36,15 +35,22 @@ function LoginForm() {
       if (!res.ok) {
         const data = await res.json();
         setError(data.error || "Sign in failed");
+        setLoading(false);
         return;
       }
 
+      // Full page redirect ensures the new session cookie is sent with the request.
+      // Using router.push() can fail silently because the soft navigation may not
+      // include the cookie that was just set via fetch().
       const from = searchParams.get("from") || "/";
-      router.push(from);
-      router.refresh();
-    } catch {
-      setError("Invalid email or password");
-    } finally {
+      window.location.href = from;
+    } catch (err) {
+      console.error("Login error:", err);
+      setError(
+        err instanceof Error && err.message.includes("auth/")
+          ? "Invalid email or password"
+          : `Sign in failed: ${err instanceof Error ? err.message : "Unknown error"}`
+      );
       setLoading(false);
     }
   }

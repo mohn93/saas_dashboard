@@ -16,23 +16,44 @@ function isYearlySubscription(sub: RawSubscriptionRow): boolean {
     parseISO(sub.current_period_end),
     parseISO(sub.current_period_start)
   );
-  // Yearly periods are typically 360-370 days
   return days > 60;
 }
 
 /**
- * Calculate MRR from active subscriptions.
- * Uses the actual price the subscriber pays:
- * - Monthly subscribers: price_monthly
- * - Yearly subscribers: price_yearly / 12
+ * Get the monthly rate for a subscription, accounting for billing interval.
+ */
+function getMonthlyRate(sub: RawSubscriptionRow): number {
+  if (isYearlySubscription(sub) && sub.price_yearly != null) {
+    return sub.price_yearly / 12;
+  }
+  return sub.price_monthly || 0;
+}
+
+/**
+ * Calculate current MRR from active subscriptions.
  */
 function calculateMRR(subscriptions: RawSubscriptionRow[]): number {
-  return subscriptions.reduce((sum, sub) => {
-    if (isYearlySubscription(sub) && sub.price_yearly != null) {
-      return sum + sub.price_yearly / 12;
-    }
-    return sum + (sub.price_monthly || 0);
-  }, 0);
+  return subscriptions.reduce((sum, sub) => sum + getMonthlyRate(sub), 0);
+}
+
+/**
+ * Compute MRR for each day in the range based on subscription created_at dates.
+ * A subscription contributes to MRR from its created_at date onward.
+ */
+function computeMRROverTime(
+  subscriptions: RawSubscriptionRow[],
+  allDates: string[]
+): DailyMRR[] {
+  return allDates.map((date) => {
+    const mrr = subscriptions.reduce((sum, sub) => {
+      const activatedOn = format(parseISO(sub.created_at), "yyyy-MM-dd");
+      if (activatedOn <= date) {
+        return sum + getMonthlyRate(sub);
+      }
+      return sum;
+    }, 0);
+    return { date, mrr };
+  });
 }
 
 /**
@@ -48,23 +69,6 @@ function generateDateRange(startDate: Date, endDate: Date): string[] {
   return dates;
 }
 
-/**
- * Fill in all days for MRR, forward-filling the last known value.
- */
-function fillMRROverTime(
-  sparse: { date: string; mrr: number }[],
-  allDates: string[]
-): DailyMRR[] {
-  const mrrByDate = new Map(sparse.map((r) => [r.date, r.mrr]));
-  let lastMRR = 0;
-
-  return allDates.map((date) => {
-    if (mrrByDate.has(date)) {
-      lastMRR = mrrByDate.get(date)!;
-    }
-    return { date, mrr: lastMRR };
-  });
-}
 
 /**
  * Fill in all days for signups, with 0 for days with no signups.
@@ -203,7 +207,6 @@ export function transformBusinessMetrics(params: {
   subscriptions: RawSubscriptionRow[];
   totalPaidUsers: number;
   activeProjects: number;
-  mrrOverTime: { date: string; mrr: number }[];
   gaVisitors: number;
   startDate: Date;
   endDate: Date;
@@ -212,7 +215,7 @@ export function transformBusinessMetrics(params: {
   const allDates = generateDateRange(params.startDate, params.endDate);
 
   const signupsOverTime = fillSignupsOverTime(params.signupsDaily, allDates);
-  const mrrOverTime = fillMRROverTime(params.mrrOverTime, allDates);
+  const mrrOverTime = computeMRROverTime(params.subscriptions, allDates);
 
   const visitorToSignupRate =
     params.gaVisitors > 0 ? params.totalSignups / params.gaVisitors : 0;

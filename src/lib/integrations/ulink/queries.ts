@@ -94,31 +94,6 @@ export async function fetchActiveSubscriptions(): Promise<{
   return { subscriptions, totalPaidUsers: count || 0 };
 }
 
-/**
- * Fetch MRR trend over time by looking at subscription activation dates.
- */
-export async function fetchMRROverTime(
-  startDate: Date,
-  endDate: Date
-): Promise<{ date: string; mrr: number }[]> {
-  const supabase = getULinkClient();
-
-  const { data, error } = await supabase
-    .rpc("get_mrr_over_time", {
-      start_date: startDate.toISOString(),
-      end_date: endDate.toISOString(),
-    });
-
-  if (error) {
-    console.error("Error fetching MRR over time:", error);
-    return [];
-  }
-
-  return (data || []).map((row: { date: string; mrr: number }) => ({
-    date: row.date,
-    mrr: Number(row.mrr),
-  }));
-}
 
 /**
  * Count distinct projects with activity (link created, link clicked, or SDK session)

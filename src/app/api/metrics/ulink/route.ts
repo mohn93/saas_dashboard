@@ -5,7 +5,6 @@ import { transformKPIs } from "@/lib/integrations/ga/transform";
 import {
   fetchSignups,
   fetchActiveSubscriptions,
-  fetchMRROverTime,
   fetchActiveProjects,
 } from "@/lib/integrations/ulink/queries";
 import { transformBusinessMetrics } from "@/lib/integrations/ulink/transform";
@@ -15,6 +14,8 @@ import {
 } from "@/lib/cache/kv";
 import { parseDateRange } from "@/lib/utils/dates";
 import type { ApiResponse, ULinkBusinessMetrics } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
 
 const METRIC_TYPE = "ulink_business";
 
@@ -39,12 +40,13 @@ export async function GET(
 
   const product = "ulink";
   const productConfig = getProduct(product)!;
+  const fresh = searchParams.get("fresh") === "true";
 
   // Check cache
   try {
     const cached = await getCachedMetrics(product, start, end, METRIC_TYPE);
 
-    if (cached.data && !cached.isStale) {
+    if (!fresh && cached.data && !cached.isStale) {
       return NextResponse.json({
         data: cached.data as unknown as ULinkBusinessMetrics,
         error: null,
@@ -57,11 +59,10 @@ export async function GET(
     try {
       const { startDate, endDate } = parseDateRange(start, end);
 
-      const [signupsResult, subsResult, mrrTimeline, gaKpisRaw, activeProjects] =
+      const [signupsResult, subsResult, gaKpisRaw, activeProjects] =
         await Promise.all([
           fetchSignups(startDate, endDate),
           fetchActiveSubscriptions(),
-          fetchMRROverTime(startDate, endDate),
           fetchKPIs(productConfig.gaPropertyId, { start, end }),
           fetchActiveProjects(startDate, endDate),
         ]);
@@ -74,7 +75,6 @@ export async function GET(
         subscriptions: subsResult.subscriptions,
         totalPaidUsers: subsResult.totalPaidUsers,
         activeProjects,
-        mrrOverTime: mrrTimeline,
         gaVisitors: gaKpis.totalUsers,
         startDate,
         endDate,
@@ -121,11 +121,10 @@ export async function GET(
     try {
       const { startDate, endDate } = parseDateRange(start, end);
 
-      const [signupsResult, subsResult, mrrTimeline, gaKpisRaw, activeProjects] =
+      const [signupsResult, subsResult, gaKpisRaw, activeProjects] =
         await Promise.all([
           fetchSignups(startDate, endDate),
           fetchActiveSubscriptions(),
-          fetchMRROverTime(startDate, endDate),
           fetchKPIs(productConfig.gaPropertyId, { start, end }),
           fetchActiveProjects(startDate, endDate),
         ]);
@@ -138,7 +137,6 @@ export async function GET(
         subscriptions: subsResult.subscriptions,
         totalPaidUsers: subsResult.totalPaidUsers,
         activeProjects,
-        mrrOverTime: mrrTimeline,
         gaVisitors: gaKpis.totalUsers,
         startDate,
         endDate,
