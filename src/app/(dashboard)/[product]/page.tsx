@@ -250,23 +250,13 @@ function ProductContent() {
             />
           </ChartErrorBoundary>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <ChartErrorBoundary fallbackMessage="Failed to load dashboard top pages">
-              <TopPagesTable
-                data={ulinkDashboardUsers.data?.topPages || []}
-                loading={ulinkDashboardUsers.loading}
-                error={ulinkDashboardUsers.error}
-              />
-            </ChartErrorBoundary>
-
-            <ChartErrorBoundary fallbackMessage="Failed to load dashboard referrers">
-              <ReferrersTable
-                data={ulinkDashboardUsers.data?.referrers || []}
-                loading={ulinkDashboardUsers.loading}
-                error={ulinkDashboardUsers.error}
-              />
-            </ChartErrorBoundary>
-          </div>
+          <ChartErrorBoundary fallbackMessage="Failed to load dashboard referrers">
+            <ReferrersTable
+              data={ulinkDashboardUsers.data?.referrers || []}
+              loading={ulinkDashboardUsers.loading}
+              error={ulinkDashboardUsers.error}
+            />
+          </ChartErrorBoundary>
         </>
       )}
 
