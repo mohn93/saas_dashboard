@@ -56,6 +56,57 @@ export async function fetchSignups(
 }
 
 /**
+ * Count paid conversions within a signup cohort.
+ *
+ * Returns the number of users who signed up between startDate and endDate
+ * and currently own a project with an active/trialing production subscription.
+ * A user with multiple paid projects is still counted once.
+ *
+ * Used to compute Signup → Paid as a cohort rate (paid-in-cohort / signups-in-cohort)
+ * rather than mixing all-time paid users with period-filtered signups.
+ */
+export async function fetchPaidCohortCount(
+  startDate: Date,
+  endDate: Date
+): Promise<number> {
+  const supabase = getULinkClient();
+
+  const { data: cohortRows, error: cohortErr } = await supabase
+    .from("users_view")
+    .select("id")
+    .gte("created_at", startDate.toISOString())
+    .lte("created_at", endDate.toISOString());
+
+  if (cohortErr) {
+    console.error("Error fetching signup cohort for paid conversion:", cohortErr);
+    return 0;
+  }
+
+  const cohortIds = new Set((cohortRows ?? []).map((r) => r.id as string));
+  if (cohortIds.size === 0) return 0;
+
+  const { data: paidRows, error: paidErr } = await supabase
+    .from("subscriptions")
+    .select("projects!inner(created_by)")
+    .in("status", ["active", "trialing"])
+    .eq("environment", "production");
+
+  if (paidErr) {
+    console.error("Error fetching paid owners for cohort conversion:", paidErr);
+    return 0;
+  }
+
+  const paidInCohort = new Set<string>();
+  for (const row of (paidRows ?? []) as Array<Record<string, unknown>>) {
+    const project = row.projects as { created_by?: string } | null;
+    const ownerId = project?.created_by;
+    if (ownerId && cohortIds.has(ownerId)) paidInCohort.add(ownerId);
+  }
+
+  return paidInCohort.size;
+}
+
+/**
  * Fetch active/trialing subscriptions with their plan pricing.
  */
 export async function fetchActiveSubscriptions(): Promise<{

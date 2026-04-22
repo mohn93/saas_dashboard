@@ -206,6 +206,7 @@ export function transformBusinessMetrics(params: {
   totalSignups: number;
   subscriptions: RawSubscriptionRow[];
   totalPaidUsers: number;
+  paidInCohort: number;
   activeProjects: number;
   gaVisitors: number;
   startDate: Date;
@@ -219,8 +220,10 @@ export function transformBusinessMetrics(params: {
 
   const visitorToSignupRate =
     params.gaVisitors > 0 ? params.totalSignups / params.gaVisitors : 0;
+  // Cohort conversion: of users who signed up in the period, how many are paying.
+  // Recent cohorts skew low because they haven't had time to convert.
   const signupToPaidRate =
-    params.totalSignups > 0 ? params.totalPaidUsers / params.totalSignups : 0;
+    params.totalSignups > 0 ? params.paidInCohort / params.totalSignups : 0;
 
   return {
     mrr,
