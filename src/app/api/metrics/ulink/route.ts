@@ -14,11 +14,58 @@ import {
   setCachedMetrics,
 } from "@/lib/cache/kv";
 import { parseDateRange } from "@/lib/utils/dates";
-import type { ApiResponse, ULinkBusinessMetrics } from "@/lib/types";
+import type {
+  ApiResponse,
+  ProductConfig,
+  ULinkBusinessMetrics,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 const METRIC_TYPE = "ulink_business";
+
+async function computeFreshMetrics(
+  start: string,
+  end: string,
+  productConfig: ProductConfig
+): Promise<ULinkBusinessMetrics> {
+  const { startDate, endDate } = parseDateRange(start, end);
+
+  const [signupsResult, subsResult, gaKpisRaw, activeProjects, paidInCohort] =
+    await Promise.all([
+      fetchSignups(startDate, endDate),
+      fetchActiveSubscriptions(),
+      fetchKPIs(productConfig.gaPropertyId, { start, end }),
+      fetchActiveProjects(startDate, endDate),
+      fetchPaidCohortCount(startDate, endDate),
+    ]);
+
+  const gaKpis = transformKPIs(gaKpisRaw);
+
+  return transformBusinessMetrics({
+    signupsDaily: signupsResult.daily,
+    totalSignups: signupsResult.total,
+    subscriptions: subsResult.subscriptions,
+    totalPaidUsers: subsResult.totalPaidUsers,
+    paidInCohort,
+    activeProjects,
+    gaVisitors: gaKpis.totalUsers,
+    startDate,
+    endDate,
+  });
+}
+
+function errorResponse(): NextResponse<ApiResponse<ULinkBusinessMetrics>> {
+  return NextResponse.json(
+    {
+      data: null,
+      error: "Failed to fetch ULink business metrics",
+      cached: false,
+      cachedAt: null,
+    },
+    { status: 502 }
+  );
+}
 
 export async function GET(
   request: NextRequest
@@ -43,7 +90,6 @@ export async function GET(
   const productConfig = getProduct(product)!;
   const fresh = searchParams.get("fresh") === "true";
 
-  // Check cache
   try {
     const cached = await getCachedMetrics(product, start, end, METRIC_TYPE);
 
@@ -56,32 +102,8 @@ export async function GET(
       });
     }
 
-    // Fetch fresh data
     try {
-      const { startDate, endDate } = parseDateRange(start, end);
-
-      const [signupsResult, subsResult, gaKpisRaw, activeProjects, paidInCohort] =
-        await Promise.all([
-          fetchSignups(startDate, endDate),
-          fetchActiveSubscriptions(),
-          fetchKPIs(productConfig.gaPropertyId, { start, end }),
-          fetchActiveProjects(startDate, endDate),
-          fetchPaidCohortCount(startDate, endDate),
-        ]);
-
-      const gaKpis = transformKPIs(gaKpisRaw);
-
-      const metrics = transformBusinessMetrics({
-        signupsDaily: signupsResult.daily,
-        totalSignups: signupsResult.total,
-        subscriptions: subsResult.subscriptions,
-        totalPaidUsers: subsResult.totalPaidUsers,
-        paidInCohort,
-        activeProjects,
-        gaVisitors: gaKpis.totalUsers,
-        startDate,
-        endDate,
-      });
+      const metrics = await computeFreshMetrics(start, end, productConfig);
 
       // Cache the result (fire and forget)
       setCachedMetrics(product, start, end, metrics, METRIC_TYPE).catch(
@@ -107,46 +129,14 @@ export async function GET(
         });
       }
 
-      return NextResponse.json(
-        {
-          data: null,
-          error: "Failed to fetch ULink business metrics",
-          cached: false,
-          cachedAt: null,
-        },
-        { status: 502 }
-      );
+      return errorResponse();
     }
   } catch (cacheError) {
     console.error("Cache check failed:", cacheError);
 
-    // If cache layer fails, try fetching directly
+    // Cache layer is down; fetch directly without caching.
     try {
-      const { startDate, endDate } = parseDateRange(start, end);
-
-      const [signupsResult, subsResult, gaKpisRaw, activeProjects, paidInCohort] =
-        await Promise.all([
-          fetchSignups(startDate, endDate),
-          fetchActiveSubscriptions(),
-          fetchKPIs(productConfig.gaPropertyId, { start, end }),
-          fetchActiveProjects(startDate, endDate),
-          fetchPaidCohortCount(startDate, endDate),
-        ]);
-
-      const gaKpis = transformKPIs(gaKpisRaw);
-
-      const metrics = transformBusinessMetrics({
-        signupsDaily: signupsResult.daily,
-        totalSignups: signupsResult.total,
-        subscriptions: subsResult.subscriptions,
-        totalPaidUsers: subsResult.totalPaidUsers,
-        paidInCohort,
-        activeProjects,
-        gaVisitors: gaKpis.totalUsers,
-        startDate,
-        endDate,
-      });
-
+      const metrics = await computeFreshMetrics(start, end, productConfig);
       return NextResponse.json({
         data: metrics,
         error: null,
@@ -154,15 +144,7 @@ export async function GET(
         cachedAt: null,
       });
     } catch {
-      return NextResponse.json(
-        {
-          data: null,
-          error: "Failed to fetch ULink business metrics",
-          cached: false,
-          cachedAt: null,
-        },
-        { status: 502 }
-      );
+      return errorResponse();
     }
   }
 }
