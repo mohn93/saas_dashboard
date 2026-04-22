@@ -3,6 +3,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Users,
   UserPlus,
   MousePointerClick,
@@ -14,6 +19,7 @@ import {
   Globe,
   CreditCard,
   FolderKanban,
+  Info,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,6 +32,7 @@ interface KPICardProps {
   loading?: boolean;
   icon?: LucideIcon;
   accentColor?: string;
+  description?: string;
 }
 
 function formatValue(value: number, type: FormatType): string {
@@ -91,6 +98,7 @@ export function KPICard({
   loading,
   icon,
   accentColor,
+  description,
 }: KPICardProps) {
   const Icon = icon || defaultIconMap[label] || Users;
   const color = accentColor || defaultColorMap[label] || "#818cf8";
@@ -99,9 +107,27 @@ export function KPICard({
     <Card className="relative overflow-hidden">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            {label}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {label}
+            </p>
+            {description && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={`About ${label}`}
+                    className="text-muted-foreground/60 transition-colors hover:text-muted-foreground focus:outline-none focus-visible:text-muted-foreground"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="start">
+                  {description}
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
           <div
             className="flex h-8 w-8 items-center justify-center rounded-lg"
             style={{ backgroundColor: `${color}20` }}
