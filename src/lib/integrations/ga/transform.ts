@@ -6,6 +6,7 @@ import type {
   CountryBreakdown,
   DeviceBreakdown,
 } from "@/lib/types";
+import { filterInternalReferrers } from "./internal-referrer-filter";
 
 interface GAMetricValue {
   value?: string | null;
@@ -81,12 +82,16 @@ export function transformReferrers(
   response: GAReportResponse
 ): ReferrerSource[] {
   const rows = response?.rows || [];
-  return rows.map((row) => ({
+  const referrers = rows.map((row) => ({
     source: getDimensionValue(row, 0),
     medium: getDimensionValue(row, 1),
     sessions: getMetricValue(row, 0),
     users: getMetricValue(row, 1),
   }));
+  // Drop self-referrals from our own product subdomains (*.shared.ly,
+  // *.ulink.ly) so the Traffic Sources panel shows only real external
+  // traffic. See ./internal-referrer-filter for the pattern list + tests.
+  return filterInternalReferrers(referrers);
 }
 
 export function transformCountryBreakdown(
