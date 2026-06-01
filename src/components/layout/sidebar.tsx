@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Globe, Link2, Flame, X } from "lucide-react";
+import { BarChart3, Globe, Link2, Flame, X, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/lib/config/site";
 import { products } from "@/lib/config/products";
@@ -33,6 +33,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       icon: productIcons[p.slug],
       color: p.color,
     })),
+    {
+      href: "/agent",
+      label: "PM Agent",
+      icon: <MessageSquare className="h-4 w-4" />,
+    },
   ];
 
   return (
