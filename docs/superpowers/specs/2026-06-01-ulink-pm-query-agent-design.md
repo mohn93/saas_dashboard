@@ -99,9 +99,13 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO pm_readonly;
 
 ## Schema + Memory Subsystem
 
-Stored in the **dashboard's own Supabase** (alongside `allowed_users`,
-`metrics_cache`), so it is durable across the serverless/ephemeral filesystem and
-shared across users. Three new tables:
+The dashboard has **no Postgres of its own** (its allowlist is the `ALLOWED_EMAILS`
+env var and its cache is Upstash Redis). So agent memory is stored in a dedicated
+**`pm_agent` schema inside ULink's existing Supabase**, written and read via the
+**service-role** REST client (`ULINK_SUPABASE_SERVICE_KEY`) the dashboard already
+uses for metrics. This is deliberately separate from the read-only `pm_readonly`
+query path: the agent never writes through the query path, and never reads memory
+through the read-only role. Three new tables (all in schema `pm_agent`):
 
 - **`agent_schema_catalog`** — introspected structure (table, column, type, FK)
   plus an editable one-line description per table/column. Refreshed on demand or
