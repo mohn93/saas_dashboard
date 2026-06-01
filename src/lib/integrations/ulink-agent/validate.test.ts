@@ -49,4 +49,21 @@ describe("validateSelect", () => {
   it("rejects statements not starting with SELECT or WITH", () => {
     expect(validateSelect("EXPLAIN SELECT 1", 1000).ok).toBe(false);
   });
+
+  it("accepts a string literal containing a semicolon", () => {
+    expect(validateSelect("SELECT id FROM users WHERE note = 'a; b'", 1000).ok).toBe(true);
+  });
+  it("accepts columns whose names contain command keywords", () => {
+    expect(validateSelect("SELECT set, comment FROM audit_log", 1000).ok).toBe(true);
+  });
+  it("accepts a dollar-quoted string containing a keyword", () => {
+    expect(validateSelect("SELECT $$ update later $$ AS note", 1000).ok).toBe(true);
+  });
+  it("rejects SELECT ... INTO", () => {
+    expect(validateSelect("SELECT id INTO TEMP TABLE stolen FROM users", 1000).ok).toBe(false);
+  });
+  it("rejects side-effecting functions", () => {
+    expect(validateSelect("SELECT dblink('h','DELETE FROM users')", 1000).ok).toBe(false);
+    expect(validateSelect("SELECT pg_read_file('/etc/passwd')", 1000).ok).toBe(false);
+  });
 });
