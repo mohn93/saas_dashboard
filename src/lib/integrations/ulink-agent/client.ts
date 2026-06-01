@@ -19,9 +19,9 @@ export function getReadOnlyPool(): Pool {
 
   // Enforce read-only + a hard statement timeout on every connection.
   pool.on("connect", (client) => {
-    client.query(
-      "SET default_transaction_read_only = on; SET statement_timeout = 15000;"
-    );
+    client
+      .query("SET default_transaction_read_only = on; SET statement_timeout = 15000;")
+      .catch((err) => console.error("Read-only pool SET failed:", err));
   });
 
   return pool;
