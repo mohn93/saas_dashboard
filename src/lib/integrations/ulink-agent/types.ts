@@ -100,6 +100,7 @@ export interface Widget {
   cachedAt: string | null;
   textMd: string | null;
   createdByEmail: string | null;
+  refreshError?: boolean; // transient client-only: last refresh failed, showing cached
 }
 
 export interface DashboardSummary {
