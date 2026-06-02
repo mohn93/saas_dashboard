@@ -30,9 +30,16 @@ export function useAgentQuery() {
       { id, question, answer: null, loading: true, feedback: null },
     ]);
 
+    // Include ALL answered turns (success AND failure) so follow-ups like
+    // "try again" / "fix it" / "now by month" have the prior question + error.
     const history: ConversationTurn[] = messages
-      .filter((m) => m.answer?.ok && m.answer.sql)
-      .map((m) => ({ question: m.question, sql: m.answer!.sql as string }));
+      .filter((m) => m.answer)
+      .map((m) => ({
+        question: m.question,
+        sql: m.answer!.sql,
+        ok: m.answer!.ok,
+        error: m.answer!.error,
+      }));
 
     try {
       const res = await fetch("/api/agent/query", {

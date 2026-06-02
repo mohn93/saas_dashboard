@@ -37,7 +37,9 @@ export interface QueryResult {
 
 export interface ConversationTurn {
   question: string;
-  sql: string;
+  sql: string | null;
+  ok: boolean;
+  error: string | null;
 }
 
 export interface AgentAnswer {

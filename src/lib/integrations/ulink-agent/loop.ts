@@ -30,7 +30,7 @@ export async function answerQuestion(
   const maxAttempts = deps.maxAttempts ?? 3;
 
   const summaries = await deps.memory.getTableSummaries();
-  const tables = await selectTables(deps.llm, input.question, summaries);
+  const tables = await selectTables(deps.llm, input.question, summaries, input.history);
   const [columns, foreignKeys, examples] = await Promise.all([
     deps.memory.getColumnsForTables(tables),
     deps.memory.getForeignKeysForTables(tables),

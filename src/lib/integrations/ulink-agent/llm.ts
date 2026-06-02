@@ -73,21 +73,34 @@ export function extractJson(text: string): unknown {
 export async function selectTables(
   llm: LLMClient,
   question: string,
-  tables: TableSummary[]
+  tables: TableSummary[],
+  history?: ConversationTurn[]
 ): Promise<string[]> {
   const known = new Set(tables.map((t) => t.table));
   const list = tables
     .map((t) => `- ${t.table}${t.description ? `: ${t.description}` : ""}`)
     .join("\n");
+  const priorQuestions = (history ?? [])
+    .map((h) => h.question)
+    .filter(Boolean)
+    .join("; ");
 
   const messages: LLMMessage[] = [
     {
       role: "system",
       content:
         "You select which database tables are needed to answer a question. " +
+        "If the question is a follow-up (e.g. 'try again', 'fix it', 'now by month'), " +
+        "use the recent questions to infer the intended data question. " +
         "Reply with ONLY a JSON array of table names (a subset of the provided list).",
     },
-    { role: "user", content: `Question: ${question}\n\nTables:\n${list}` },
+    {
+      role: "user",
+      content:
+        `Question: ${question}\n` +
+        (priorQuestions ? `Recent questions in this conversation: ${priorQuestions}\n` : "") +
+        `\nTables:\n${list}`,
+    },
   ];
 
   try {
@@ -139,7 +152,13 @@ export async function generateSql(
     .map((e) => `Q: ${e.question}\nSQL: ${e.sql}`)
     .join("\n\n");
   const history = (input.history ?? [])
-    .map((h) => `Earlier Q: ${h.question}\nEarlier SQL: ${h.sql}`)
+    .map((h) =>
+      h.ok
+        ? `Earlier question: ${h.question}\nSQL used: ${h.sql}`
+        : `Earlier question: ${h.question}\nThat attempt FAILED` +
+          (h.error ? ` (error: ${h.error})` : "") +
+          (h.sql ? `\nFailed SQL: ${h.sql}` : "")
+    )
     .join("\n\n");
 
   const messages: LLMMessage[] = [
@@ -148,6 +167,10 @@ export async function generateSql(
       content:
         "You translate a question into ONE read-only PostgreSQL SELECT. " +
         "Never write data (no INSERT/UPDATE/DELETE/DDL). Use only the given columns. " +
+        "If the user message is a follow-up (e.g. 'try again', 'fix it', or 'now by month'), " +
+        "use 'Conversation so far' to recover the actual data question and answer THAT — " +
+        "if an earlier attempt FAILED, re-attempt the same intent. " +
+        "Always return a real analytical query against the schema; never a placeholder like SELECT 'ok'. " +
         'Reply with ONLY JSON: {"sql": string, "chart": {"type": "bar"|"line"|"area"|"none", ' +
         '"xColumn": string|null, "yColumn": string|null}}. ' +
         "Choose a chart only if the result is naturally chartable; otherwise type \"none\".",
