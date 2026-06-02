@@ -48,3 +48,4 @@ firestore-ui-*.json
 # claude code
 .claude/
 .mcp.json
+.env*
