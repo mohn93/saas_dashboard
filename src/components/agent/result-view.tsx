@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format, parseISO, isValid } from "date-fns";
+import * as Popover from "@radix-ui/react-popover";
+import { Maximize2 } from "lucide-react";
 import { BarChart, LineChart, AreaChart } from "@tremor/react";
 import {
   Table,
@@ -52,6 +54,58 @@ function renderCell(value: unknown) {
   }
 
   return <span>{String(value)}</span>;
+}
+
+// Plain-string form of a cell value, for the expand popup.
+function cellFullText(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "object") return JSON.stringify(value, null, 2);
+  return String(value);
+}
+
+// A single-line, ellipsized cell. When the content is actually truncated, an
+// expand icon appears on hover and opens a popup with the full value.
+function TruncatedCell({ value }: { value: unknown }) {
+  const spanRef = useRef<HTMLSpanElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const el = spanRef.current;
+    if (el) setOverflowing(el.scrollWidth > el.clientWidth + 1);
+  }, [value]);
+
+  return (
+    <div className="group/cell flex items-center gap-1">
+      <span ref={spanRef} className="block max-w-[18rem] truncate">
+        {renderCell(value)}
+      </span>
+      {overflowing && (
+        <Popover.Root open={open} onOpenChange={setOpen}>
+          <Popover.Trigger asChild>
+            <button
+              type="button"
+              aria-label="Show full value"
+              className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus:opacity-100 group-hover/cell:opacity-100 data-[state=open]:opacity-100"
+            >
+              <Maximize2 className="h-3 w-3" />
+            </button>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              align="start"
+              sideOffset={6}
+              className="z-50 max-h-80 w-[min(28rem,90vw)] overflow-auto rounded-lg border border-border/50 bg-card p-3 shadow-lg"
+            >
+              <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
+                {cellFullText(value)}
+              </pre>
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
+      )}
+    </div>
+  );
 }
 
 function Chart({ answer }: { answer: AgentAnswer }) {
@@ -111,7 +165,9 @@ export function ResultView({ answer }: { answer: AgentAnswer }) {
             {visibleRows.map((row, i) => (
               <TableRow key={i}>
                 {result.columns.map((c) => (
-                  <TableCell key={c}>{renderCell(row[c])}</TableCell>
+                  <TableCell key={c}>
+                    <TruncatedCell value={row[c]} />
+                  </TableCell>
                 ))}
               </TableRow>
             ))}
