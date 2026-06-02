@@ -23,4 +23,5 @@ export type AgentEvent =
     }
   | { type: "narration"; delta: string }
   | { type: "done"; logId: string | null }
-  | { type: "error"; error: string };
+  | { type: "error"; error: string }
+  | { type: "conversation"; conversationId: string; title: string };

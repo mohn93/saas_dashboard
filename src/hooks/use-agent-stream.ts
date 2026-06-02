@@ -1,78 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import type { AgentEvent, AgentPhase } from "@/lib/integrations/ulink-agent/events";
-import type {
-  ChartSpec,
-  ConversationTurn,
-  QueryResult,
-} from "@/lib/integrations/ulink-agent/types";
+import type { AgentEvent } from "@/lib/integrations/ulink-agent/events";
+import type { ConversationTurn, ConversationSummary } from "@/lib/integrations/ulink-agent/types";
+import {
+  applyEvent,
+  emptyMessage,
+  type AgentMessage,
+  type AgentStep,
+} from "@/lib/integrations/ulink-agent/message";
 
-export interface AgentStep {
-  label: string;
-  detail?: string;
-}
-
-export interface AgentMessage {
-  id: string;
-  question: string;
-  phase: AgentPhase | "idle";
-  reasoning: string;
-  steps: AgentStep[];
-  sql: string | null;
-  chart: ChartSpec | null;
-  result: QueryResult | null;
-  narration: string;
-  error: string | null;
-  logId: string | null;
-  loading: boolean;
-  feedback: "up" | "down" | null;
-}
-
-export function emptyMessage(id: string, question: string): AgentMessage {
-  return {
-    id,
-    question,
-    phase: "idle",
-    reasoning: "",
-    steps: [],
-    sql: null,
-    chart: null,
-    result: null,
-    narration: "",
-    error: null,
-    logId: null,
-    loading: true,
-    feedback: null,
-  };
-}
-
-export function applyEvent(m: AgentMessage, e: AgentEvent): AgentMessage {
-  switch (e.type) {
-    case "phase":
-      return { ...m, phase: e.phase, loading: e.phase !== "done" && e.phase !== "error" };
-    case "step":
-      return { ...m, steps: [...m.steps, { label: e.label, detail: e.detail }] };
-    case "reasoning":
-      return { ...m, reasoning: m.reasoning + e.delta };
-    case "sql":
-      return { ...m, sql: e.sql };
-    case "result":
-      return {
-        ...m,
-        result: { columns: e.columns, rows: e.rows, rowCount: e.rowCount },
-        chart: e.chart,
-      };
-    case "narration":
-      return { ...m, narration: m.narration + e.delta };
-    case "done":
-      return { ...m, logId: e.logId, loading: false, phase: "done" };
-    case "error":
-      return { ...m, error: e.error, loading: false, phase: "error" };
-    default:
-      return m;
-  }
-}
+// Re-exported for backward compatibility — prefer importing directly from
+// @/lib/integrations/ulink-agent/message in server-usable code.
+export { applyEvent, emptyMessage };
+export type { AgentMessage, AgentStep };
 
 let counter = 0;
 function nextId(): string {
@@ -80,8 +21,11 @@ function nextId(): string {
   return `m${counter}`;
 }
 
-export function useAgentStream() {
+export function useAgentStream(
+  onConversation?: (summary: { id: string; title: string }) => void
+) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   async function ask(question: string) {
     const id = nextId();
@@ -103,7 +47,7 @@ export function useAgentStream() {
       const res = await fetch("/api/agent/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, history }),
+        body: JSON.stringify({ question, history, conversationId }),
       });
       if (!res.body) throw new Error("No response stream");
       const reader = res.body.getReader();
@@ -114,6 +58,11 @@ export function useAgentStream() {
         if (!trimmed) return;
         try {
           const event = JSON.parse(trimmed) as AgentEvent;
+          if (event.type === "conversation") {
+            setConversationId(event.conversationId);
+            onConversation?.({ id: event.conversationId, title: event.title });
+            return;
+          }
           update((m) => applyEvent(m, event));
         } catch {
           /* skip malformed line */
@@ -154,5 +103,25 @@ export function useAgentStream() {
     }
   }
 
-  return { messages, ask, sendFeedback };
+  async function load(id: string) {
+    try {
+      const res = await fetch(`/api/agent/conversations/${id}`);
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        conversation: ConversationSummary;
+        messages: AgentMessage[];
+      };
+      setMessages(data.messages.map((m) => ({ ...m, loading: false })));
+      setConversationId(id);
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  function newChat() {
+    setMessages([]);
+    setConversationId(null);
+  }
+
+  return { messages, conversationId, ask, sendFeedback, load, newChat };
 }
