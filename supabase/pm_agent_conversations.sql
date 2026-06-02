@@ -26,5 +26,20 @@ create index if not exists messages_conversation_created_idx
 alter table pm_agent.conversations enable row level security;
 alter table pm_agent.messages      enable row level security;
 
+-- Keep conversations.updated_at fresh whenever a turn is appended (atomic with the insert).
+create or replace function pm_agent.bump_conversation_updated_at()
+  returns trigger language plpgsql as $$
+  begin
+    update pm_agent.conversations
+      set updated_at = now()
+      where id = new.conversation_id;
+    return new;
+  end $$;
+
+drop trigger if exists messages_bump_updated_at on pm_agent.messages;
+create trigger messages_bump_updated_at
+  after insert on pm_agent.messages
+  for each row execute function pm_agent.bump_conversation_updated_at();
+
 -- PostgREST must reload to expose the new tables (the pm_agent schema is already exposed).
 notify pgrst, 'reload schema';

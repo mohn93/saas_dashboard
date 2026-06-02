@@ -60,11 +60,8 @@ export const conversationStore: ConversationStore = {
       user_email: userEmail,
     });
     if (error) throw new Error(`appendMessage(insert): ${error.message}`);
-    const { error: touchErr } = await db()
-      .from("conversations")
-      .update({ updated_at: new Date().toISOString() })
-      .eq("id", conversationId);
-    if (touchErr) throw new Error(`appendMessage(touch): ${touchErr.message}`);
+    // updated_at on the parent conversation is bumped by a DB trigger
+    // (messages_bump_updated_at) on insert — no second round-trip needed.
   },
 
   async listConversations() {
@@ -104,6 +101,11 @@ export const conversationStore: ConversationStore = {
   },
 };
 
+// Persists one completed turn. Returns { conversationId, title } where `title` is
+// deriveTitle() of THIS turn's question — authoritative only for a newly-created
+// conversation. For an existing conversation the stored title is unchanged; callers
+// that display titles should treat the conversation-list endpoint as the source of
+// truth (the client refreshes from it) rather than this returned value.
 export async function persistTurn(
   store: ConversationStore,
   input: {
@@ -113,6 +115,7 @@ export async function persistTurn(
     events: AgentEvent[];
   }
 ): Promise<{ conversationId: string; title: string }> {
+  // id is intentionally "" here; the DB row id is injected by hydrateMessage on read.
   const payload = input.events.reduce(applyEvent, emptyMessage("", input.question));
   const title = deriveTitle(input.question);
   let conversationId = input.conversationId;

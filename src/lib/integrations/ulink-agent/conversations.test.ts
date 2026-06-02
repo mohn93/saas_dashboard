@@ -17,6 +17,7 @@ describe("deriveTitle", () => {
     const out = deriveTitle(long);
     expect(out.length).toBeLessThanOrEqual(60);
     expect(out.endsWith("…")).toBe(true);
+    expect(out).toBe("a".repeat(59) + "…");
   });
   it("falls back to 'New chat' when empty", () => {
     expect(deriveTitle("   ")).toBe("New chat");
@@ -82,6 +83,7 @@ describe("persistTurn", () => {
       events,
     });
     expect(out.conversationId).toBe("existing-id");
+    expect(out.title).toBe("now by month"); // derived from the current question
     expect(calls.created).toHaveLength(0);
     expect(calls.appended[0].conversationId).toBe("existing-id");
   });
