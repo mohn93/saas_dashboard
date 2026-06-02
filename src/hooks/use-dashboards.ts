@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DashboardSummary } from "@/lib/integrations/ulink-agent/types";
 
-export function useDashboards() {
+export function useDashboards({ auto = true }: { auto?: boolean } = {}) {
   const [dashboards, setDashboards] = useState<DashboardSummary[]>([]);
 
   const refresh = useCallback(async () => {
@@ -49,8 +49,8 @@ export function useDashboards() {
   );
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (auto) void refresh();
+  }, [auto, refresh]);
 
   return { dashboards, refresh, create, remove };
 }

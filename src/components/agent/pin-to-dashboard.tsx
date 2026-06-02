@@ -9,7 +9,7 @@ import { widgetFromAnswer } from "@/lib/integrations/ulink-agent/widgets";
 import type { AgentMessage } from "@/lib/integrations/ulink-agent/message";
 
 export function PinToDashboard({ message }: { message: AgentMessage }) {
-  const { dashboards, create } = useDashboards();
+  const { dashboards, create, refresh } = useDashboards({ auto: false });
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [savedTo, setSavedTo] = useState<string | null>(null);
@@ -23,13 +23,16 @@ export function PinToDashboard({ message }: { message: AgentMessage }) {
       chart: message.chart,
       result: message.result,
     });
-    const res = await fetch(`/api/agent/dashboards/${dashboardId}/widgets`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    setBusy(false);
-    if (res.ok) setSavedTo(dashboardId);
+    try {
+      const res = await fetch(`/api/agent/dashboards/${dashboardId}/widgets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (res.ok) setSavedTo(dashboardId);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function pinToNew() {
@@ -46,7 +49,8 @@ export function PinToDashboard({ message }: { message: AgentMessage }) {
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
-        if (!o) setSavedTo(null);
+        if (o) void refresh();
+        else setSavedTo(null);
       }}
     >
       <Popover.Trigger asChild>
