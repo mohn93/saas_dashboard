@@ -49,3 +49,6 @@ firestore-ui-*.json
 .claude/
 .mcp.json
 .env*
+
+# Brainstorming visual companion
+.superpowers/
