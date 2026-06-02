@@ -39,37 +39,39 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
       };
       try {
-        await runAgent(
-          { question, userEmail, history },
-          {
-            reasoner: getDeepSeekClient(),
-            fast: getFastClient(),
-            memory: supabaseMemory,
-            execute: executeReadOnly,
-          },
-          emit
-        );
-      } catch (err) {
-        emit({
-          type: "error",
-          error: err instanceof Error ? err.message : "Agent failed",
-        });
-      }
+        try {
+          await runAgent(
+            { question, userEmail, history },
+            {
+              reasoner: getDeepSeekClient(),
+              fast: getFastClient(),
+              memory: supabaseMemory,
+              execute: executeReadOnly,
+            },
+            emit
+          );
+        } catch (err) {
+          emit({
+            type: "error",
+            error: err instanceof Error ? err.message : "Agent failed",
+          });
+        }
 
-      // Persist the turn (best-effort: never break the answer if storage fails).
-      try {
-        const { conversationId: id, title } = await persistTurn(conversationStore, {
-          question,
-          conversationId,
-          userEmail,
-          events: collected,
-        });
-        emit({ type: "conversation", conversationId: id, title });
-      } catch (persistErr) {
-        console.error("Persist turn failed:", persistErr);
+        // Persist the turn (best-effort: never break the answer if storage fails).
+        try {
+          const { conversationId: id, title } = await persistTurn(conversationStore, {
+            question,
+            conversationId,
+            userEmail,
+            events: collected,
+          });
+          emit({ type: "conversation", conversationId: id, title });
+        } catch (persistErr) {
+          console.error("Persist turn failed:", persistErr);
+        }
+      } finally {
+        controller.close();
       }
-
-      controller.close();
     },
   });
 
