@@ -26,6 +26,24 @@ describe("applyEvent (message reducer)", () => {
     expect(m.logId).toBe("log-1");
     expect(m.loading).toBe(false);
   });
+
+  it("updates phase and loading flag on phase event", () => {
+    let m = emptyMessage("m1", "q");
+    m = applyEvent(m, { type: "phase", phase: "selecting" });
+    expect(m.phase).toBe("selecting");
+    expect(m.loading).toBe(true);
+    m = applyEvent(m, { type: "phase", phase: "done" });
+    expect(m.phase).toBe("done");
+    expect(m.loading).toBe(false);
+  });
+
+  it("sets error and stops loading on error event", () => {
+    let m = emptyMessage("m2", "q");
+    m = applyEvent(m, { type: "error", error: "boom" });
+    expect(m.error).toBe("boom");
+    expect(m.loading).toBe(false);
+    expect(m.phase).toBe("error");
+  });
 });
 
 describe("conversation event", () => {
@@ -43,7 +61,7 @@ describe("conversation event", () => {
 describe("hydrateMessage", () => {
   it("rebuilds a finished AgentMessage from a stored payload", () => {
     const payload = {
-      ...emptyMessage("", "how many links"),
+      ...emptyMessage("stale-id", "how many links"),
       narration: "You have 5 links.",
       sql: "SELECT 1",
       logId: "log-1",

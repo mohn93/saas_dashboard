@@ -10,6 +10,8 @@ import {
   type AgentStep,
 } from "@/lib/integrations/ulink-agent/message";
 
+// Re-exported for backward compatibility — prefer importing directly from
+// @/lib/integrations/ulink-agent/message in server-usable code.
 export { applyEvent, emptyMessage };
 export type { AgentMessage, AgentStep };
 
