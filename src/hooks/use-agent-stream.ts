@@ -6,7 +6,6 @@ import type { ConversationTurn, ConversationSummary } from "@/lib/integrations/u
 import {
   applyEvent,
   emptyMessage,
-  hydrateMessage,
   type AgentMessage,
   type AgentStep,
 } from "@/lib/integrations/ulink-agent/message";
