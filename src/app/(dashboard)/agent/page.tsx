@@ -11,7 +11,7 @@ export default function AgentPage() {
   const list = useConversationList();
   const onConversation = useCallback(() => {
     void list.refresh();
-  }, [list]);
+  }, [list.refresh]);
   const { messages, conversationId, ask, sendFeedback, load, newChat } =
     useAgentStream(onConversation);
   const [input, setInput] = useState("");

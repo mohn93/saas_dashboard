@@ -30,6 +30,10 @@ export async function POST(request: NextRequest) {
     typeof body.conversationId === "string" ? body.conversationId : null;
   const userEmail = await getSessionEmail(request);
 
+  if (!userEmail) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  }
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {

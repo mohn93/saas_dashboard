@@ -23,9 +23,10 @@ export function useConversationList() {
     try {
       await fetch(`/api/agent/conversations/${id}`, { method: "DELETE" });
     } catch {
-      /* best-effort; refresh will reconcile on next mount */
+      // delete failed — re-sync from the server so the row reappears
+      void refresh();
     }
-  }, []);
+  }, [refresh]);
 
   useEffect(() => {
     void refresh();
