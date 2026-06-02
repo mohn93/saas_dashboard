@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuth } from "@/lib/firebase/admin";
-import { answerQuestion } from "@/lib/integrations/ulink-agent/loop";
+// TODO(Task 5): replaced by runAgent streaming route
+// import { answerQuestion } from "@/lib/integrations/ulink-agent/loop";
 import { getDeepSeekClient } from "@/lib/integrations/ulink-agent/llm";
 import { supabaseMemory } from "@/lib/integrations/ulink-agent/memory";
 import { executeReadOnly } from "@/lib/integrations/ulink-agent/client";
@@ -40,17 +41,11 @@ export async function POST(request: NextRequest) {
 
   const userEmail = await getUserEmail(request);
 
-  try {
-    const answer = await answerQuestion(
-      { question: body.question, userEmail, history },
-      { llm: getDeepSeekClient(), memory: supabaseMemory, execute: executeReadOnly }
-    );
-    return NextResponse.json(answer);
-  } catch (err) {
-    console.error("Agent query failed:", err);
-    return NextResponse.json(
-      { error: "Agent failed to process the question" },
-      { status: 502 }
-    );
-  }
+  // TODO(Task 5): replace with runAgent streaming implementation
+  void getDeepSeekClient();
+  void supabaseMemory;
+  void executeReadOnly;
+  void history;
+  void userEmail;
+  return NextResponse.json({ error: "Not yet implemented" }, { status: 501 });
 }
