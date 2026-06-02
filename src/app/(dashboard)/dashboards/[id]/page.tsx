@@ -28,7 +28,7 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
   if (notFound) {
     return (
       <div className="space-y-4">
-        <button onClick={() => router.push("/dashboards")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <button type="button" onClick={() => router.push("/dashboards")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Back to dashboards
         </button>
         <p className="text-sm text-muted-foreground">This dashboard doesn&apos;t exist.</p>
@@ -88,7 +88,7 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
 
   return (
     <div className="space-y-6">
-      <button onClick={() => router.push("/dashboards")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+      <button type="button" onClick={() => router.push("/dashboards")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Dashboards
       </button>
 
