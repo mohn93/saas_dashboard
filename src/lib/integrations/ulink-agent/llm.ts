@@ -12,17 +12,46 @@ export interface LLMMessage {
   content: string;
 }
 
-export interface LLMClient {
-  complete(messages: LLMMessage[]): Promise<string>;
+export interface StreamHandlers {
+  onReasoning?: (delta: string) => void;
+  onContent?: (delta: string) => void;
 }
 
-export function getDeepSeekClient(): LLMClient {
+export interface LLMClient {
+  model: string;
+  complete(messages: LLMMessage[]): Promise<string>;
+  stream(messages: LLMMessage[], handlers: StreamHandlers): Promise<string>;
+}
+
+// Parse one SSE line ("data: {json}") into content/reasoning deltas.
+// Returns null for keep-alives, [DONE], blank lines, and malformed JSON.
+export function parseSseLine(
+  line: string
+): { content: string; reasoning: string } | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("data:")) return null;
+  const payload = trimmed.slice(5).trim();
+  if (payload === "" || payload === "[DONE]") return null;
+  try {
+    const json = JSON.parse(payload);
+    const delta = json?.choices?.[0]?.delta ?? {};
+    return {
+      content: typeof delta.content === "string" ? delta.content : "",
+      reasoning:
+        typeof delta.reasoning_content === "string" ? delta.reasoning_content : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildClient(model: string): LLMClient {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("DEEPSEEK_API_KEY must be set");
   const baseUrl = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
-  const model = process.env.DEEPSEEK_MODEL || "deepseek-chat";
 
   return {
+    model,
     async complete(messages: LLMMessage[]): Promise<string> {
       const res = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
@@ -40,7 +69,51 @@ export function getDeepSeekClient(): LLMClient {
       if (typeof content !== "string") throw new Error("LLM returned no content");
       return content;
     },
+    async stream(messages: LLMMessage[], handlers: StreamHandlers): Promise<string> {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model, messages, temperature: 0, stream: true }),
+      });
+      if (!res.ok || !res.body) {
+        throw new Error(`LLM stream failed: ${res.status}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let full = "";
+      const handle = (line: string) => {
+        const parsed = parseSseLine(line);
+        if (!parsed) return;
+        if (parsed.reasoning) handlers.onReasoning?.(parsed.reasoning);
+        if (parsed.content) {
+          full += parsed.content;
+          handlers.onContent?.(parsed.content);
+        }
+      };
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) handle(line);
+      }
+      handle(buffer);
+      return full;
+    },
   };
+}
+
+export function getDeepSeekClient(): LLMClient {
+  return buildClient(process.env.DEEPSEEK_MODEL || "deepseek-reasoner");
+}
+
+export function getFastClient(): LLMClient {
+  return buildClient(process.env.DEEPSEEK_FAST_MODEL || "deepseek-chat");
 }
 
 export function extractJson(text: string): unknown {

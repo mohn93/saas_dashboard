@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { extractJson, selectTables, generateSql } from "./llm";
+import { extractJson, selectTables, generateSql, parseSseLine } from "./llm";
 import type { LLMClient } from "./llm";
 
 function stubLLM(response: string): LLMClient {
-  return { complete: async () => response };
+  return {
+    model: "test",
+    complete: async () => response,
+    stream: async (_messages, handlers) => {
+      handlers.onContent?.(response);
+      return response;
+    },
+  };
 }
 
 describe("extractJson", () => {
@@ -34,6 +41,25 @@ describe("selectTables", () => {
       { table: "users", description: null },
     ]);
     expect(out).toEqual(["users"]);
+  });
+});
+
+describe("parseSseLine", () => {
+  it("parses a content delta", () => {
+    const line = 'data: {"choices":[{"delta":{"content":"hel"}}]}';
+    expect(parseSseLine(line)).toEqual({ content: "hel", reasoning: "" });
+  });
+  it("parses a reasoning delta", () => {
+    const line = 'data: {"choices":[{"delta":{"reasoning_content":"think"}}]}';
+    expect(parseSseLine(line)).toEqual({ content: "", reasoning: "think" });
+  });
+  it("returns null for [DONE] and non-data lines", () => {
+    expect(parseSseLine("data: [DONE]")).toBeNull();
+    expect(parseSseLine("")).toBeNull();
+    expect(parseSseLine(": keep-alive")).toBeNull();
+  });
+  it("returns null for malformed JSON", () => {
+    expect(parseSseLine("data: {not json")).toBeNull();
   });
 });
 
