@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Send, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react";
-import { useAgentQuery } from "@/hooks/use-agent-query";
-import { ResultView } from "@/components/agent/result-view";
-import { cn } from "@/lib/utils";
+import { Send } from "lucide-react";
+import { useAgentStream } from "@/hooks/use-agent-stream";
+import { AgentMessage } from "@/components/agent/agent-message";
 
 export default function AgentPage() {
-  const { messages, ask, sendFeedback } = useAgentQuery();
+  const { messages, ask, sendFeedback } = useAgentStream();
   const [input, setInput] = useState("");
 
   function submit(e: React.FormEvent) {
@@ -23,7 +22,7 @@ export default function AgentPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">PM Data Agent</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Ask questions about ULink in plain English. Read-only.
+          Ask about ULink in plain English — it explains the answer and shows the data. Read-only.
         </p>
       </div>
 
@@ -34,46 +33,7 @@ export default function AgentPage() {
           </p>
         )}
         {messages.map((m) => (
-          <div key={m.id} className="space-y-3">
-            <div className="rounded-lg bg-accent/40 px-3 py-2 text-sm font-medium">
-              {m.question}
-            </div>
-            {m.loading && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Thinking…
-              </div>
-            )}
-            {m.answer && <ResultView answer={m.answer} />}
-            {m.answer?.ok && m.answer.logId && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => sendFeedback(m.id, m.answer!.logId!, true)}
-                  className={cn(
-                    "rounded-md p-1.5 hover:bg-accent",
-                    m.feedback === "up" && "text-green-400"
-                  )}
-                  aria-label="Helpful"
-                >
-                  <ThumbsUp className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => sendFeedback(m.id, m.answer!.logId!, false)}
-                  className={cn(
-                    "rounded-md p-1.5 hover:bg-accent",
-                    m.feedback === "down" && "text-red-400"
-                  )}
-                  aria-label="Not helpful"
-                >
-                  <ThumbsDown className="h-4 w-4" />
-                </button>
-                {m.feedback === "up" && (
-                  <span className="text-xs text-muted-foreground">
-                    Saved as a trusted example
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+          <AgentMessage key={m.id} message={m} onFeedback={sendFeedback} />
         ))}
       </div>
 
