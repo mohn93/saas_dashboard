@@ -82,3 +82,30 @@ export interface ConversationSummary {
   createdByEmail: string | null;
   updatedAt: string;
 }
+
+export type WidgetKind = "chart" | "table" | "kpi" | "text";
+export type WidgetSize = "sm" | "md" | "full";
+
+export interface Widget {
+  id: string;
+  dashboardId: string;
+  kind: WidgetKind;
+  title: string;
+  position: number;
+  size: WidgetSize;
+  question: string | null;
+  sql: string | null;
+  chart: ChartSpec | null;
+  result: QueryResult | null; // from cached_result
+  cachedAt: string | null;
+  textMd: string | null;
+  createdByEmail: string | null;
+}
+
+export interface DashboardSummary {
+  id: string;
+  name: string;
+  widgetCount: number;
+  createdByEmail: string | null;
+  updatedAt: string;
+}
