@@ -6,6 +6,7 @@ import { RefreshCw, Pencil, Check, ArrowLeft } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { DashboardGrid } from "@/components/dashboard-builder/dashboard-grid";
 import { AddWidgetComposer } from "@/components/dashboard-builder/add-widget-composer";
+import type { ChartSpec, QueryResult } from "@/lib/integrations/ulink-agent/types";
 
 export default function DashboardDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -53,17 +54,18 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
       const decoder = new TextDecoder();
       let buffer = "";
       let sql: string | null = null;
-      let chart = null as unknown;
-      let result = null as unknown;
+      let chart: ChartSpec | null = null;
+      let result: QueryResult | null = null;
       const consume = (line: string) => {
         const t = line.trim();
         if (!t) return;
         try {
           const e = JSON.parse(t) as { type: string; [k: string]: unknown };
           if (e.type === "sql") sql = e.sql as string;
-          if (e.type === "result")
-            result = { columns: e.columns, rows: e.rows, rowCount: e.rowCount };
-          if (e.type === "result") chart = e.chart;
+          if (e.type === "result") {
+            result = { columns: e.columns, rows: e.rows, rowCount: e.rowCount } as QueryResult;
+            chart = (e.chart ?? null) as ChartSpec | null;
+          }
         } catch {
           /* skip */
         }
@@ -77,12 +79,12 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
         for (const l of lines) consume(l);
       }
       consume(buffer);
-      await updateWidget(id, {
-        question: next.trim(),
-        sql,
-        chart: chart as never,
-        result: result as never,
-      });
+      // A failed or chat-path re-ask yields no query/result — never blank a working widget.
+      if (sql === null || result === null) {
+        window.alert("The agent didn't return a query for that question — the widget was left unchanged.");
+        return;
+      }
+      await updateWidget(id, { question: next.trim(), sql, chart, result });
     })();
   }
 
