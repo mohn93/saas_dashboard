@@ -1,15 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getAdminAuth } from "@/lib/firebase/admin";
-import { answerQuestion } from "@/lib/integrations/ulink-agent/loop";
-import { getDeepSeekClient } from "@/lib/integrations/ulink-agent/llm";
+import { runAgent } from "@/lib/integrations/ulink-agent/loop";
+import { getDeepSeekClient, getFastClient } from "@/lib/integrations/ulink-agent/llm";
 import { supabaseMemory } from "@/lib/integrations/ulink-agent/memory";
 import { executeReadOnly } from "@/lib/integrations/ulink-agent/client";
 import type { ConversationTurn } from "@/lib/integrations/ulink-agent/types";
+import type { AgentEvent } from "@/lib/integrations/ulink-agent/events";
 
 export const dynamic = "force-dynamic";
-// deepseek-reasoner (R1) is slow (~10-30s) and the loop may make several calls
-// (table-select + up to 3 SQL attempts). Allow up to 60s so Vercel doesn't time
-// out mid-query. Raise (Pro/Fluid supports up to 300) if heavy queries still hit it.
+// R1 is slow; the loop may make several calls. Allow up to 60s (raise on Pro/Fluid).
 export const maxDuration = 60;
 
 async function getUserEmail(request: NextRequest): Promise<string | null> {
@@ -28,29 +27,49 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400 });
   }
-
   if (typeof body.question !== "string" || !body.question.trim()) {
-    return NextResponse.json({ error: "question is required" }, { status: 400 });
+    return new Response(JSON.stringify({ error: "question is required" }), { status: 400 });
   }
+  const question = body.question;
   const history = Array.isArray(body.history)
     ? (body.history as ConversationTurn[]).slice(-5)
     : [];
-
   const userEmail = await getUserEmail(request);
 
-  try {
-    const answer = await answerQuestion(
-      { question: body.question, userEmail, history },
-      { llm: getDeepSeekClient(), memory: supabaseMemory, execute: executeReadOnly }
-    );
-    return NextResponse.json(answer);
-  } catch (err) {
-    console.error("Agent query failed:", err);
-    return NextResponse.json(
-      { error: "Agent failed to process the question" },
-      { status: 502 }
-    );
-  }
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const emit = (e: AgentEvent) =>
+        controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
+      try {
+        await runAgent(
+          { question, userEmail, history },
+          {
+            reasoner: getDeepSeekClient(),
+            fast: getFastClient(),
+            memory: supabaseMemory,
+            execute: executeReadOnly,
+          },
+          emit
+        );
+      } catch (err) {
+        emit({
+          type: "error",
+          error: err instanceof Error ? err.message : "Agent failed",
+        });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }

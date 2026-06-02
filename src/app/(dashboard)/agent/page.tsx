@@ -1,14 +1,33 @@
 "use client";
 
-import { useState } from "react";
-import { Send, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react";
-import { useAgentQuery } from "@/hooks/use-agent-query";
-import { ResultView } from "@/components/agent/result-view";
-import { cn } from "@/lib/utils";
+import { useEffect, useRef, useState } from "react";
+import { Send } from "lucide-react";
+import { useAgentStream } from "@/hooks/use-agent-stream";
+import { AgentMessage } from "@/components/agent/agent-message";
 
 export default function AgentPage() {
-  const { messages, ask, sendFeedback } = useAgentQuery();
+  const { messages, ask, sendFeedback } = useAgentStream();
   const [input, setInput] = useState("");
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true); // are we pinned near the bottom?
+  const prevLenRef = useRef(0);
+
+  function onScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }
+
+  // Auto-scroll on a new message, and while streaming if already near the bottom.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const newMessage = messages.length > prevLenRef.current;
+    prevLenRef.current = messages.length;
+    if (newMessage) stickRef.current = true;
+    if (newMessage || stickRef.current) el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,57 +42,22 @@ export default function AgentPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">PM Data Agent</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Ask questions about ULink in plain English. Read-only.
+          Ask about ULink in plain English — it explains the answer and shows the data. Read-only.
         </p>
       </div>
 
-      <div className="mt-6 flex-1 space-y-6 overflow-y-auto pb-4">
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="mt-6 flex-1 space-y-6 overflow-y-auto pb-4"
+      >
         {messages.length === 0 && (
           <p className="text-sm text-muted-foreground">
             e.g. &ldquo;How many signups per week over the last 8 weeks?&rdquo;
           </p>
         )}
         {messages.map((m) => (
-          <div key={m.id} className="space-y-3">
-            <div className="rounded-lg bg-accent/40 px-3 py-2 text-sm font-medium">
-              {m.question}
-            </div>
-            {m.loading && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Thinking…
-              </div>
-            )}
-            {m.answer && <ResultView answer={m.answer} />}
-            {m.answer?.ok && m.answer.logId && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => sendFeedback(m.id, m.answer!.logId!, true)}
-                  className={cn(
-                    "rounded-md p-1.5 hover:bg-accent",
-                    m.feedback === "up" && "text-green-400"
-                  )}
-                  aria-label="Helpful"
-                >
-                  <ThumbsUp className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => sendFeedback(m.id, m.answer!.logId!, false)}
-                  className={cn(
-                    "rounded-md p-1.5 hover:bg-accent",
-                    m.feedback === "down" && "text-red-400"
-                  )}
-                  aria-label="Not helpful"
-                >
-                  <ThumbsDown className="h-4 w-4" />
-                </button>
-                {m.feedback === "up" && (
-                  <span className="text-xs text-muted-foreground">
-                    Saved as a trusted example
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+          <AgentMessage key={m.id} message={m} onFeedback={sendFeedback} />
         ))}
       </div>
 
