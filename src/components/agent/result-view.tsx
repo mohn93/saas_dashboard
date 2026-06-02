@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { format, parseISO, isValid } from "date-fns";
 import { BarChart, LineChart, AreaChart } from "@tremor/react";
 import {
   Table,
@@ -11,6 +12,47 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { AgentAnswer } from "@/lib/integrations/ulink-agent/types";
+
+const COLLAPSED_ROWS = 4;
+const MAX_ROWS = 100;
+
+// ISO date or datetime, e.g. "2026-05-06" or "2026-05-06T04:44:25.000Z".
+const ISO_DATE_RE =
+  /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+
+function renderCell(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return <span className="text-muted-foreground/40">—</span>;
+  }
+
+  // Humanize ISO dates/timestamps, with the exact date on hover (no raw ISO).
+  if (typeof value === "string" && ISO_DATE_RE.test(value)) {
+    const d = parseISO(value);
+    if (isValid(d)) {
+      const hasTime = /[T ]\d{2}:\d{2}/.test(value);
+      const display = hasTime
+        ? format(d, "MMM d, yyyy, h:mm a")
+        : format(d, "MMM d, yyyy");
+      const exact = hasTime
+        ? format(d, "EEEE, MMMM d, yyyy 'at' h:mm:ss a")
+        : format(d, "EEEE, MMMM d, yyyy");
+      return (
+        <span
+          title={exact}
+          className="cursor-help whitespace-nowrap underline decoration-dotted decoration-muted-foreground/40 underline-offset-2"
+        >
+          {display}
+        </span>
+      );
+    }
+  }
+
+  if (typeof value === "object") {
+    return <span className="font-mono text-xs">{JSON.stringify(value)}</span>;
+  }
+
+  return <span>{String(value)}</span>;
+}
 
 function Chart({ answer }: { answer: AgentAnswer }) {
   const { chart, result } = answer;
@@ -34,6 +76,7 @@ function Chart({ answer }: { answer: AgentAnswer }) {
 
 export function ResultView({ answer }: { answer: AgentAnswer }) {
   const [showSql, setShowSql] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   if (!answer.ok) {
     return (
@@ -47,6 +90,10 @@ export function ResultView({ answer }: { answer: AgentAnswer }) {
   }
 
   const result = answer.result!;
+  const cappedRows = result.rows.slice(0, MAX_ROWS);
+  const visibleRows = expanded ? cappedRows : cappedRows.slice(0, COLLAPSED_ROWS);
+  const hiddenCount = cappedRows.length - visibleRows.length;
+
   return (
     <div className="space-y-3">
       <Chart answer={answer} />
@@ -61,10 +108,10 @@ export function ResultView({ answer }: { answer: AgentAnswer }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {result.rows.slice(0, 100).map((row, i) => (
+            {visibleRows.map((row, i) => (
               <TableRow key={i}>
                 {result.columns.map((c) => (
-                  <TableCell key={c}>{String(row[c] ?? "")}</TableCell>
+                  <TableCell key={c}>{renderCell(row[c])}</TableCell>
                 ))}
               </TableRow>
             ))}
@@ -72,17 +119,28 @@ export function ResultView({ answer }: { answer: AgentAnswer }) {
         </Table>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {result.rowCount} row{result.rowCount === 1 ? "" : "s"}
-        {result.rowCount > 100 ? " (showing first 100)" : ""}
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-xs text-muted-foreground">
+          {result.rowCount} row{result.rowCount === 1 ? "" : "s"}
+          {result.rowCount > MAX_ROWS ? ` (first ${MAX_ROWS} shown)` : ""}
+          {!expanded && hiddenCount > 0 ? ` · showing ${visibleRows.length}` : ""}
+        </p>
+        {cappedRows.length > COLLAPSED_ROWS && (
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="text-xs font-medium text-violet-400 hover:text-violet-300"
+          >
+            {expanded ? "Show less" : `Show all ${cappedRows.length}`}
+          </button>
+        )}
+        <button
+          onClick={() => setShowSql((s) => !s)}
+          className="ml-auto text-xs text-muted-foreground underline-offset-2 hover:underline"
+        >
+          {showSql ? "Hide SQL" : "View SQL"}
+        </button>
+      </div>
 
-      <button
-        onClick={() => setShowSql((s) => !s)}
-        className="text-xs text-muted-foreground underline-offset-2 hover:underline"
-      >
-        {showSql ? "Hide SQL" : "View SQL"}
-      </button>
       {showSql && (
         <pre className="overflow-x-auto rounded-lg border border-border/50 bg-muted/30 p-3 text-xs">
           {answer.sql}
