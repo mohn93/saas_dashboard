@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
-import { getAdminAuth } from "@/lib/firebase/admin";
 import { runAgent } from "@/lib/integrations/ulink-agent/loop";
 import { getDeepSeekClient, getFastClient } from "@/lib/integrations/ulink-agent/llm";
 import { supabaseMemory } from "@/lib/integrations/ulink-agent/memory";
+import { conversationStore, persistTurn } from "@/lib/integrations/ulink-agent/conversations";
 import { executeReadOnly } from "@/lib/integrations/ulink-agent/client";
+import { getSessionEmail } from "@/lib/auth/session";
 import type { ConversationTurn } from "@/lib/integrations/ulink-agent/types";
 import type { AgentEvent } from "@/lib/integrations/ulink-agent/events";
 
@@ -11,19 +12,8 @@ export const dynamic = "force-dynamic";
 // R1 is slow; the loop may make several calls. Allow up to 60s (raise on Pro/Fluid).
 export const maxDuration = 60;
 
-async function getUserEmail(request: NextRequest): Promise<string | null> {
-  const session = request.cookies.get("fw_session")?.value;
-  if (!session) return null;
-  try {
-    const decoded = await getAdminAuth().verifySessionCookie(session, true);
-    return decoded.email ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export async function POST(request: NextRequest) {
-  let body: { question?: unknown; history?: unknown };
+  let body: { question?: unknown; history?: unknown; conversationId?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -36,13 +26,18 @@ export async function POST(request: NextRequest) {
   const history = Array.isArray(body.history)
     ? (body.history as ConversationTurn[]).slice(-5)
     : [];
-  const userEmail = await getUserEmail(request);
+  const conversationId =
+    typeof body.conversationId === "string" ? body.conversationId : null;
+  const userEmail = await getSessionEmail(request);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const emit = (e: AgentEvent) =>
+      const collected: AgentEvent[] = [];
+      const emit = (e: AgentEvent) => {
+        collected.push(e);
         controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
+      };
       try {
         await runAgent(
           { question, userEmail, history },
@@ -59,9 +54,22 @@ export async function POST(request: NextRequest) {
           type: "error",
           error: err instanceof Error ? err.message : "Agent failed",
         });
-      } finally {
-        controller.close();
       }
+
+      // Persist the turn (best-effort: never break the answer if storage fails).
+      try {
+        const { conversationId: id, title } = await persistTurn(conversationStore, {
+          question,
+          conversationId,
+          userEmail,
+          events: collected,
+        });
+        emit({ type: "conversation", conversationId: id, title });
+      } catch (persistErr) {
+        console.error("Persist turn failed:", persistErr);
+      }
+
+      controller.close();
     },
   });
 
