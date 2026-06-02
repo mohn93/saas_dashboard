@@ -88,7 +88,14 @@ export function useDashboard(id: string) {
 
   const updateWidget = useCallback(
     async (wid: string, patch: WidgetPatch) => {
-      setWidget(wid, (w) => ({ ...w, ...patch } as Widget)); // optimistic for simple fields
+      setWidget(wid, (w) => ({
+        ...w,
+        ...patch,
+        // mirror the store: a fresh result resets the cache stamp + error flag
+        ...(patch.result !== undefined
+          ? { cachedAt: new Date().toISOString(), refreshError: false }
+          : {}),
+      } as Widget)); // optimistic
       try {
         await fetch(`/api/agent/widgets/${wid}`, {
           method: "PATCH",
@@ -99,7 +106,7 @@ export function useDashboard(id: string) {
         void load();
       }
     },
-    [id, setWidget, load]
+    [setWidget, load]
   );
 
   const removeWidget = useCallback(
