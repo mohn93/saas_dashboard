@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronRight, Loader2, ThumbsUp, ThumbsDown, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ResultView } from "@/components/agent/result-view";
+import { PinToDashboard } from "@/components/agent/pin-to-dashboard";
 import type { AgentMessage as AgentMessageType } from "@/hooks/use-agent-stream";
 import type { AgentAnswer } from "@/lib/integrations/ulink-agent/types";
 
@@ -107,26 +108,31 @@ export function AgentMessage({
       {/* result table/chart */}
       {resultAnswer && <ResultView answer={resultAnswer} />}
 
-      {/* feedback */}
-      {finished && !message.error && message.logId && (
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => onFeedback(message.id, message.logId!, true)}
-            className={cn("rounded-md p-1.5 hover:bg-accent", message.feedback === "up" && "text-green-400")}
-            aria-label="Helpful"
-          >
-            <ThumbsUp className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => onFeedback(message.id, message.logId!, false)}
-            className={cn("rounded-md p-1.5 hover:bg-accent", message.feedback === "down" && "text-red-400")}
-            aria-label="Not helpful"
-          >
-            <ThumbsDown className="h-4 w-4" />
-          </button>
-          {message.feedback === "up" && (
-            <span className="text-xs text-muted-foreground">Saved as a trusted example</span>
+      {/* feedback + pin */}
+      {finished && !message.error && (message.logId || message.result) && (
+        <div className="flex items-center gap-2">
+          {message.logId && (
+            <>
+              <button
+                onClick={() => onFeedback(message.id, message.logId!, true)}
+                className={cn("rounded-md p-1.5 hover:bg-accent", message.feedback === "up" && "text-green-400")}
+                aria-label="Helpful"
+              >
+                <ThumbsUp className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => onFeedback(message.id, message.logId!, false)}
+                className={cn("rounded-md p-1.5 hover:bg-accent", message.feedback === "down" && "text-red-400")}
+                aria-label="Not helpful"
+              >
+                <ThumbsDown className="h-4 w-4" />
+              </button>
+              {message.feedback === "up" && (
+                <span className="text-xs text-muted-foreground">Saved as a trusted example</span>
+              )}
+            </>
           )}
+          {message.result && <PinToDashboard message={message} />}
         </div>
       )}
     </div>
