@@ -7,6 +7,10 @@ import { executeReadOnly } from "@/lib/integrations/ulink-agent/client";
 import type { ConversationTurn } from "@/lib/integrations/ulink-agent/types";
 
 export const dynamic = "force-dynamic";
+// deepseek-reasoner (R1) is slow (~10-30s) and the loop may make several calls
+// (table-select + up to 3 SQL attempts). Allow up to 60s so Vercel doesn't time
+// out mid-query. Raise (Pro/Fluid supports up to 300) if heavy queries still hit it.
+export const maxDuration = 60;
 
 async function getUserEmail(request: NextRequest): Promise<string | null> {
   const session = request.cookies.get("fw_session")?.value;
