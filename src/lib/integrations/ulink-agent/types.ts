@@ -75,3 +75,10 @@ export interface MemoryStore {
     foreignKeys: CatalogForeignKey[];
   }): Promise<void>;
 }
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  createdByEmail: string | null;
+  updatedAt: string;
+}
