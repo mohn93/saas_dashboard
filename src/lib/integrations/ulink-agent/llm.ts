@@ -4,6 +4,7 @@ import type {
   CatalogForeignKey,
   ChartSpec,
   ConversationTurn,
+  QueryResult,
   TableSummary,
 } from "./types";
 
@@ -191,6 +192,84 @@ export async function selectTables(
   return tables.map((t) => t.table); // safe fallback: everything
 }
 
+export interface PlanResult {
+  kind: "chat" | "data";
+  reply?: string;
+}
+
+export async function planMessage(
+  fast: LLMClient,
+  question: string,
+  history: ConversationTurn[],
+  tables: TableSummary[]
+): Promise<PlanResult> {
+  const tableList = tables.map((t) => `- ${t.table}`).join("\n");
+  const recent = history.map((h) => `Q: ${h.question}${h.ok ? "" : " (failed)"}`).join("\n");
+  const messages: LLMMessage[] = [
+    {
+      role: "system",
+      content:
+        "You are the planner for a ULink analytics assistant. Decide whether the user's " +
+        "message needs a database query. Reply with ONLY JSON: " +
+        '{"kind":"data"} if it asks about ULink data/metrics, or ' +
+        '{"kind":"chat","reply":"..."} for greetings, thanks, clarifications, or general ' +
+        "questions, where reply is a brief, friendly answer. If the user refers to a previous " +
+        "question (e.g. 'try again', 'now by month'), treat it as data.",
+    },
+    {
+      role: "user",
+      content:
+        `Message: ${question}\n` +
+        (recent ? `Recent questions:\n${recent}\n` : "") +
+        `\nAvailable tables:\n${tableList}`,
+    },
+  ];
+  try {
+    const raw = await fast.complete(messages);
+    const parsed = extractJson(raw) as { kind?: string; reply?: string };
+    if (parsed?.kind === "chat") {
+      return {
+        kind: "chat",
+        reply:
+          typeof parsed.reply === "string" && parsed.reply.trim()
+            ? parsed.reply
+            : "How can I help with your ULink data?",
+      };
+    }
+    return { kind: "data" };
+  } catch {
+    return { kind: "data" };
+  }
+}
+
+export async function narrate(
+  fast: LLMClient,
+  input: { question: string; sql: string; result: QueryResult },
+  onContent: (delta: string) => void
+): Promise<string> {
+  const preview = {
+    columns: input.result.columns,
+    rowCount: input.result.rowCount,
+    rows: input.result.rows.slice(0, 50),
+  };
+  const messages: LLMMessage[] = [
+    {
+      role: "system",
+      content:
+        "You are a data analyst assistant for ULink. Given a question and its query results, " +
+        "write a concise, friendly answer (1-4 sentences) stating the key numbers/findings. " +
+        "Only use values present in the results; never invent data. Do not show SQL. " +
+        "If rowCount is 0, say no matching data was found.",
+    },
+    {
+      role: "user",
+      content:
+        `Question: ${input.question}\n\nResults (JSON, up to 50 rows):\n${JSON.stringify(preview)}`,
+    },
+  ];
+  return fast.stream(messages, { onContent });
+}
+
 export interface GenerateSqlInput {
   question: string;
   columns: CatalogColumn[];
@@ -209,7 +288,8 @@ const DEFAULT_CHART: ChartSpec = { type: "none", xColumn: null, yColumn: null };
 
 export async function generateSql(
   llm: LLMClient,
-  input: GenerateSqlInput
+  input: GenerateSqlInput,
+  onReasoning?: (delta: string) => void
 ): Promise<GeneratedSql> {
   const cols = input.columns
     .map(
@@ -262,7 +342,7 @@ export async function generateSql(
     },
   ];
 
-  const raw = await llm.complete(messages);
+  const raw = await llm.stream(messages, { onReasoning });
   const parsed = extractJson(raw) as { sql?: unknown; chart?: Partial<ChartSpec> };
   if (!parsed || typeof parsed.sql !== "string") {
     throw new Error("LLM did not return a SQL string");
