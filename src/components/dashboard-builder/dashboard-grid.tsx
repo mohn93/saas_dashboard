@@ -2,6 +2,7 @@
 
 import {
   DndContext,
+  KeyboardSensor,
   PointerSensor,
   closestCenter,
   useSensor,
@@ -12,6 +13,7 @@ import {
   SortableContext,
   rectSortingStrategy,
   arrayMove,
+  sortableKeyboardCoordinates,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -51,7 +53,7 @@ function SortableCell({
     opacity: isDragging ? 0.6 : 1,
   };
   return (
-    <div ref={setNodeRef} style={style} className={SPAN_CLASS[sizeToCols(widget.size)]}>
+    <div ref={setNodeRef} style={style} className={SPAN_CLASS[sizeToCols(widget.size)] ?? "md:col-span-6"}>
       <DashboardWidget
         widget={widget}
         editing={editing}
@@ -84,7 +86,10 @@ export function DashboardGrid({
   onEditQuery: (id: string) => void;
   children?: React.ReactNode; // the "Add widget" tile, rendered after the cells
 }) {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   function handleDragEnd(e: DragEndEvent) {
     const { active, over } = e;
