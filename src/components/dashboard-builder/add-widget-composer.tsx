@@ -39,9 +39,12 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
       title: title || message.question,
       size,
     });
-    await onAdd(input);
-    setSaving(false);
-    close();
+    try {
+      await onAdd(input);
+      close();
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function addTextWidget() {
@@ -57,9 +60,12 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
       result: null,
       textMd: textBody,
     };
-    await onAdd(input);
-    setSaving(false);
-    close();
+    try {
+      await onAdd(input);
+      close();
+    } finally {
+      setSaving(false);
+    }
   }
 
   // Preview as a faux widget so it looks like it will on the dashboard.
