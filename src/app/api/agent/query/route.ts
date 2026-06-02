@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
-  let body: { question?: unknown; history?: unknown; conversationId?: unknown };
+  let body: { question?: unknown; history?: unknown; conversationId?: unknown; persist?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
     : [];
   const conversationId =
     typeof body.conversationId === "string" ? body.conversationId : null;
+  const persist = body.persist !== false; // default true; the dashboard composer sends false
   const userEmail = await getSessionEmail(request);
 
   if (!userEmail) {
@@ -62,16 +63,20 @@ export async function POST(request: NextRequest) {
         }
 
         // Persist the turn (best-effort: never break the answer if storage fails).
-        try {
-          const { conversationId: id, title } = await persistTurn(conversationStore, {
-            question,
-            conversationId,
-            userEmail,
-            events: collected,
-          });
-          emit({ type: "conversation", conversationId: id, title });
-        } catch (persistErr) {
-          console.error("Persist turn failed:", persistErr);
+        // The dashboard composer streams with persist:false — it composes a widget and
+        // must not create a conversation.
+        if (persist) {
+          try {
+            const { conversationId: id, title } = await persistTurn(conversationStore, {
+              question,
+              conversationId,
+              userEmail,
+              events: collected,
+            });
+            emit({ type: "conversation", conversationId: id, title });
+          } catch (persistErr) {
+            console.error("Persist turn failed:", persistErr);
+          }
         }
       } finally {
         controller.close();
