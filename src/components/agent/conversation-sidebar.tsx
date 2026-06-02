@@ -21,6 +21,7 @@ export function ConversationSidebar({
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-border/50 pr-3">
       <button
+        type="button"
         onClick={onNew}
         className="mb-3 flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-sm font-medium hover:bg-accent"
       >
@@ -47,6 +48,7 @@ export function ConversationSidebar({
               </div>
             </div>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(c.id);
