@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { useAgentStream } from "@/hooks/use-agent-stream";
 import { AgentMessage } from "@/components/agent/agent-message";
@@ -8,6 +8,26 @@ import { AgentMessage } from "@/components/agent/agent-message";
 export default function AgentPage() {
   const { messages, ask, sendFeedback } = useAgentStream();
   const [input, setInput] = useState("");
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true); // are we pinned near the bottom?
+  const prevLenRef = useRef(0);
+
+  function onScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }
+
+  // Auto-scroll on a new message, and while streaming if already near the bottom.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const newMessage = messages.length > prevLenRef.current;
+    prevLenRef.current = messages.length;
+    if (newMessage) stickRef.current = true;
+    if (newMessage || stickRef.current) el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,7 +46,11 @@ export default function AgentPage() {
         </p>
       </div>
 
-      <div className="mt-6 flex-1 space-y-6 overflow-y-auto pb-4">
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="mt-6 flex-1 space-y-6 overflow-y-auto pb-4"
+      >
         {messages.length === 0 && (
           <p className="text-sm text-muted-foreground">
             e.g. &ldquo;How many signups per week over the last 8 weeks?&rdquo;
