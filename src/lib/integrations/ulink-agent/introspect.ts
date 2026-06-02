@@ -2,10 +2,13 @@ import { getReadOnlyPool } from "./client";
 import { supabaseMemory } from "./memory";
 import type { CatalogColumn, CatalogForeignKey, MemoryStore } from "./types";
 
+// Include VIEWs as well as base tables: some user-facing data the agent must reach
+// (e.g. user email) lives only in a view such as public.users_view. information_schema
+// already filters to objects the read-only role can see, so only selectable views appear.
 const TABLES_SQL = `
   SELECT table_name
   FROM information_schema.tables
-  WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+  WHERE table_schema = 'public' AND table_type IN ('BASE TABLE', 'VIEW')
   ORDER BY table_name
 `;
 
