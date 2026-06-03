@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Sparkles, Type, X, Loader2 } from "lucide-react";
 import { useAgentCompose } from "@/hooks/use-agent-compose";
 import { WidgetBody } from "./widget-body";
-import { widgetFromAnswer } from "@/lib/integrations/ulink-agent/widgets";
+import {
+  widgetFromAnswer,
+  canChart,
+  pickInitialKind,
+  resolveWidgetChart,
+} from "@/lib/integrations/ulink-agent/widgets";
 import type { WidgetCreateInput } from "@/lib/integrations/ulink-agent/widgets";
-import type { Widget, WidgetKind, WidgetSize } from "@/lib/integrations/ulink-agent/types";
+import { WidgetKindPicker } from "./widget-kind-picker";
+import type { Widget, WidgetKind, WidgetSize, ChartType } from "@/lib/integrations/ulink-agent/types";
 
 type Mode = "tile" | "menu" | "query" | "text";
 
@@ -18,6 +24,19 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
   const [textBody, setTextBody] = useState("");
   const [saving, setSaving] = useState(false);
   const { message, run, reset } = useAgentCompose();
+  const [kind, setKind] = useState<WidgetKind>("table");
+  const [chartType, setChartType] = useState<ChartType>("bar");
+
+  useEffect(() => {
+    if (message?.result) {
+      setKind(pickInitialKind(message.result, message.chart, message.display));
+      setChartType(message.chart && message.chart.type !== "none" ? message.chart.type : "bar");
+    }
+  }, [message?.result, message?.chart, message?.display]);
+
+  const chartable =
+    canChart(message?.result ?? null) ||
+    !!(message?.chart && message.chart.xColumn && message.chart.yColumn);
 
   function close() {
     setMode("tile");
@@ -25,6 +44,8 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
     setTitle("");
     setTextBody("");
     setSize("md");
+    setKind("table");
+    setChartType("bar");
     reset();
   }
 
@@ -34,10 +55,11 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
     const input = widgetFromAnswer({
       question: message.question,
       sql: message.sql,
-      chart: message.chart,
       result: message.result,
       title: title || message.question,
       size,
+      kind,
+      chart: resolveWidgetChart(message.result, message.chart, kind, chartType),
     });
     try {
       await onAdd(input);
@@ -69,17 +91,17 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
   }
 
   // Preview as a faux widget so it looks like it will on the dashboard.
-  const previewWidget: Widget | null = message
+  const previewWidget: Widget | null = message?.result
     ? {
         id: "preview",
         dashboardId: "",
-        kind: (message.result ? widgetFromAnswer({ question: message.question, sql: message.sql, chart: message.chart, result: message.result }).kind : "table") as WidgetKind,
+        kind,
         title: title || message.question,
         position: 0,
         size,
         question: message.question,
         sql: message.sql,
-        chart: message.chart,
+        chart: resolveWidgetChart(message.result, message.chart, kind, chartType),
         result: message.result,
         cachedAt: null,
         textMd: null,
@@ -162,22 +184,31 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
           )}
 
           {message && !message.loading && !message.error && message.result && (
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={message.question}
-                className="flex-1 rounded-lg border border-border/50 bg-background px-3 py-1.5 text-sm outline-none focus:border-violet-500"
+            <div className="space-y-2">
+              <WidgetKindPicker
+                kind={kind}
+                chartType={chartType}
+                chartable={chartable}
+                onKindChange={setKind}
+                onChartTypeChange={setChartType}
               />
-              <SizePicker size={size} onChange={setSize} />
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void addQueryWidget()}
-                className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50"
-              >
-                Add to dashboard
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={message.question}
+                  className="flex-1 rounded-lg border border-border/50 bg-background px-3 py-1.5 text-sm outline-none focus:border-violet-500"
+                />
+                <SizePicker size={size} onChange={setSize} />
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void addQueryWidget()}
+                  className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50"
+                >
+                  Add to dashboard
+                </button>
+              </div>
             </div>
           )}
         </div>

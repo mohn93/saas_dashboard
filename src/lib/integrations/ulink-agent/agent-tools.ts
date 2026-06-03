@@ -2,7 +2,7 @@ import { generateSql, type LLMClient, type ParsedToolCall, type ToolDef } from "
 import { validateSelect } from "./validate";
 import { CHART_TYPES } from "./types";
 import type { AgentEvent } from "./events";
-import type { ChartSpec, MemoryStore, QueryResult } from "./types";
+import type { ChartSpec, DisplayMode, MemoryStore, QueryResult } from "./types";
 
 export const QUERY_TOOL = "query";
 export const CLARIFY_TOOL = "clarify";
@@ -31,6 +31,14 @@ export const TOOL_DEFS: ToolDef[] = [
               "Optional: the chart type to render when the user asked for a specific one " +
               "(e.g. 'pie'). Honored as long as the result has a label column + a numeric column. " +
               "Omit to let the system pick automatically.",
+          },
+          display: {
+            type: "string",
+            enum: ["table", "chart", "both"],
+            description:
+              "How to present the result to the user. 'table' (default) shows just the table; " +
+              "'chart' shows the chart with the table collapsed; 'both' shows chart + table. " +
+              "Set 'chart' or 'both' only when a chart genuinely helps.",
           },
         },
         required: ["question"],
@@ -74,7 +82,8 @@ export interface ToolOutcome {
 async function runQuery(
   question: string,
   ctx: ToolContext,
-  chartHint?: ChartSpec["type"]
+  chartHint?: ChartSpec["type"],
+  display: DisplayMode = "table"
 ): Promise<ToolOutcome> {
   ctx.emit({ type: "step", label: "Querying", detail: question });
 
@@ -141,6 +150,7 @@ async function runQuery(
     rows: result.rows,
     rowCount: result.rowCount,
     chart: gen.chart,
+    display,
   });
 
   const logId = await ctx.memory.insertQueryLog({
@@ -168,7 +178,7 @@ export async function dispatchTool(
   call: ParsedToolCall,
   ctx: ToolContext
 ): Promise<ToolOutcome> {
-  let args: { question?: unknown; chart?: unknown };
+  let args: { question?: unknown; chart?: unknown; display?: unknown };
   try {
     args = JSON.parse(call.arguments || "{}");
   } catch {
@@ -178,10 +188,16 @@ export async function dispatchTool(
   const chartHint = CHART_TYPES.includes(args.chart as (typeof CHART_TYPES)[number])
     ? (args.chart as ChartSpec["type"])
     : undefined;
+  const DISPLAY_MODES = ["table", "chart", "both"] as const;
+  const displayArg = DISPLAY_MODES.includes(args.display as (typeof DISPLAY_MODES)[number])
+    ? (args.display as DisplayMode)
+    : undefined;
+  // Convenience: a chart type with no explicit display means "show a chart".
+  const display: DisplayMode = displayArg ?? (chartHint && chartHint !== "none" ? "chart" : "table");
 
   if (call.name === QUERY_TOOL) {
     if (!question) return { content: JSON.stringify({ error: "query requires a 'question' string" }) };
-    return runQuery(question, ctx, chartHint);
+    return runQuery(question, ctx, chartHint, display);
   }
   if (call.name === CLARIFY_TOOL) {
     if (!question) return { content: JSON.stringify({ error: "clarify requires a 'question' string" }) };

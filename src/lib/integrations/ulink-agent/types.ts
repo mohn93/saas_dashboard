@@ -7,6 +7,8 @@ export interface ChartSpec {
   yColumn: string | null; // numeric value column
 }
 
+export type DisplayMode = "table" | "chart" | "both";
+
 export interface CatalogColumn {
   table: string;
   column: string;

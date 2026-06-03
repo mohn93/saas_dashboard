@@ -1,5 +1,5 @@
 import type { AgentEvent, AgentPhase } from "./events";
-import type { ChartSpec, QueryResult } from "./types";
+import type { ChartSpec, DisplayMode, QueryResult } from "./types";
 
 export interface AgentStep {
   label: string;
@@ -15,6 +15,7 @@ export interface AgentMessage {
   sql: string | null;
   chart: ChartSpec | null;
   result: QueryResult | null;
+  display: DisplayMode;
   narration: string;
   error: string | null;
   logId: string | null;
@@ -32,6 +33,7 @@ export function emptyMessage(id: string, question: string): AgentMessage {
     sql: null,
     chart: null,
     result: null,
+    display: "both",
     narration: "",
     error: null,
     logId: null,
@@ -55,6 +57,7 @@ export function applyEvent(m: AgentMessage, e: AgentEvent): AgentMessage {
         ...m,
         result: { columns: e.columns, rows: e.rows, rowCount: e.rowCount },
         chart: e.chart,
+        display: e.display,
       };
     case "narration":
       return { ...m, narration: m.narration + e.delta };

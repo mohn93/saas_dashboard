@@ -5,8 +5,19 @@ import * as Popover from "@radix-ui/react-popover";
 import Link from "next/link";
 import { LayoutDashboard, Plus, Check } from "lucide-react";
 import { useDashboards } from "@/hooks/use-dashboards";
-import { widgetFromAnswer } from "@/lib/integrations/ulink-agent/widgets";
+import {
+  widgetFromAnswer,
+  canChart,
+  pickInitialKind,
+  resolveWidgetChart,
+} from "@/lib/integrations/ulink-agent/widgets";
+import { WidgetKindPicker } from "@/components/dashboard-builder/widget-kind-picker";
 import type { AgentMessage } from "@/lib/integrations/ulink-agent/message";
+import type { ChartType, WidgetKind } from "@/lib/integrations/ulink-agent/types";
+
+function initialChartType(message: AgentMessage): ChartType {
+  return message.chart && message.chart.type !== "none" ? message.chart.type : "bar";
+}
 
 export function PinToDashboard({ message }: { message: AgentMessage }) {
   const { dashboards, create, refresh } = useDashboards({ auto: false });
@@ -14,14 +25,22 @@ export function PinToDashboard({ message }: { message: AgentMessage }) {
   const [newName, setNewName] = useState("");
   const [savedTo, setSavedTo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [kind, setKind] = useState<WidgetKind>(() =>
+    pickInitialKind(message.result, message.chart, message.display)
+  );
+  const [chartType, setChartType] = useState<ChartType>(() => initialChartType(message));
+
+  const chartable =
+    canChart(message.result) || !!(message.chart && message.chart.xColumn && message.chart.yColumn);
 
   async function pin(dashboardId: string) {
     setBusy(true);
     const input = widgetFromAnswer({
       question: message.question,
       sql: message.sql,
-      chart: message.chart,
       result: message.result,
+      kind,
+      chart: resolveWidgetChart(message.result, message.chart, kind, chartType),
     });
     try {
       const res = await fetch(`/api/agent/dashboards/${dashboardId}/widgets`, {
@@ -80,8 +99,17 @@ export function PinToDashboard({ message }: { message: AgentMessage }) {
               </Link>
             </div>
           ) : (
-            <div className="space-y-1">
-              <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Pin to…</p>
+            <div className="space-y-2">
+              <div className="px-1">
+                <WidgetKindPicker
+                  kind={kind}
+                  chartType={chartType}
+                  chartable={chartable}
+                  onKindChange={setKind}
+                  onChartTypeChange={setChartType}
+                />
+              </div>
+              <p className="px-2 pt-1 text-xs font-medium text-muted-foreground">Pin to…</p>
               <div className="max-h-48 overflow-y-auto">
                 {dashboards.map((d) => (
                   <button

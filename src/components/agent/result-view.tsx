@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { AgentAnswer } from "@/lib/integrations/ulink-agent/types";
+import type { AgentAnswer, DisplayMode } from "@/lib/integrations/ulink-agent/types";
 
 const COLLAPSED_ROWS = 4;
 const MAX_ROWS = 100;
@@ -138,9 +138,16 @@ function Chart({ answer }: { answer: AgentAnswer }) {
   return <BarChart data={data} index={xCol} categories={categories} className="h-64 mt-4" />;
 }
 
-export function ResultView({ answer }: { answer: AgentAnswer }) {
+export function ResultView({
+  answer,
+  display = "both",
+}: {
+  answer: AgentAnswer;
+  display?: DisplayMode;
+}) {
   const [showSql, setShowSql] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [showTable, setShowTable] = useState(display !== "chart");
 
   if (!answer.ok) {
     return (
@@ -158,59 +165,79 @@ export function ResultView({ answer }: { answer: AgentAnswer }) {
   const visibleRows = expanded ? cappedRows : cappedRows.slice(0, COLLAPSED_ROWS);
   const hiddenCount = cappedRows.length - visibleRows.length;
 
+  const showChart = display !== "table";
+  const tableCollapsible = display === "chart";
+  const tableVisible = !tableCollapsible || showTable;
+
   return (
     <div className="space-y-3">
-      <Chart answer={answer} />
+      {showChart && <Chart answer={answer} />}
 
-      <div className="overflow-x-auto rounded-lg border border-border/50">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {result.columns.map((c) => (
-                <TableHead key={c}>{c}</TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visibleRows.map((row, i) => (
-              <TableRow key={i}>
-                {result.columns.map((c) => (
-                  <TableCell key={c}>
-                    <TruncatedCell value={row[c]} />
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <p className="text-xs text-muted-foreground">
-          {result.rowCount} row{result.rowCount === 1 ? "" : "s"}
-          {result.rowCount > MAX_ROWS ? ` (first ${MAX_ROWS} shown)` : ""}
-          {!expanded && hiddenCount > 0 ? ` · showing ${visibleRows.length}` : ""}
-        </p>
-        {cappedRows.length > COLLAPSED_ROWS && (
-          <button
-            onClick={() => setExpanded((e) => !e)}
-            className="text-xs font-medium text-violet-400 hover:text-violet-300"
-          >
-            {expanded ? "Show less" : `Show all ${cappedRows.length}`}
-          </button>
-        )}
+      {tableCollapsible && (
         <button
-          onClick={() => setShowSql((s) => !s)}
-          className="ml-auto text-xs text-muted-foreground underline-offset-2 hover:underline"
+          type="button"
+          onClick={() => setShowTable((s) => !s)}
+          className="text-xs font-medium text-violet-400 hover:text-violet-300"
         >
-          {showSql ? "Hide SQL" : "View SQL"}
+          {showTable ? "Hide table" : "Show table"}
         </button>
-      </div>
+      )}
 
-      {showSql && (
-        <pre className="overflow-x-auto rounded-lg border border-border/50 bg-muted/30 p-3 text-xs">
-          {answer.sql}
-        </pre>
+      {tableVisible && (
+        <>
+          <div className="overflow-x-auto rounded-lg border border-border/50">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {result.columns.map((c) => (
+                    <TableHead key={c}>{c}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibleRows.map((row, i) => (
+                  <TableRow key={i}>
+                    {result.columns.map((c) => (
+                      <TableCell key={c}>
+                        <TruncatedCell value={row[c]} />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-xs text-muted-foreground">
+              {result.rowCount} row{result.rowCount === 1 ? "" : "s"}
+              {result.rowCount > MAX_ROWS ? ` (first ${MAX_ROWS} shown)` : ""}
+              {!expanded && hiddenCount > 0 ? ` · showing ${visibleRows.length}` : ""}
+            </p>
+            {cappedRows.length > COLLAPSED_ROWS && (
+              <button
+                type="button"
+                onClick={() => setExpanded((e) => !e)}
+                className="text-xs font-medium text-violet-400 hover:text-violet-300"
+              >
+                {expanded ? "Show less" : `Show all ${cappedRows.length}`}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowSql((s) => !s)}
+              className="ml-auto text-xs text-muted-foreground underline-offset-2 hover:underline"
+            >
+              {showSql ? "Hide SQL" : "View SQL"}
+            </button>
+          </div>
+
+          {showSql && (
+            <pre className="overflow-x-auto rounded-lg border border-border/50 bg-muted/30 p-3 text-xs">
+              {answer.sql}
+            </pre>
+          )}
+        </>
       )}
     </div>
   );
