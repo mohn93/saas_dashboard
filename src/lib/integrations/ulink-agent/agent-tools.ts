@@ -1,9 +1,8 @@
 import { generateSql, type LLMClient, type ParsedToolCall, type ToolDef } from "./llm";
 import { validateSelect } from "./validate";
+import { CHART_TYPES } from "./types";
 import type { AgentEvent } from "./events";
 import type { ChartSpec, MemoryStore, QueryResult } from "./types";
-
-const CHART_TYPES = ["bar", "line", "area", "pie", "none"] as const;
 
 export const QUERY_TOOL = "query";
 export const CLARIFY_TOOL = "clarify";
@@ -27,7 +26,7 @@ export const TOOL_DEFS: ToolDef[] = [
           },
           chart: {
             type: "string",
-            enum: ["bar", "line", "area", "pie", "none"],
+            enum: [...CHART_TYPES],
             description:
               "Optional: the chart type to render when the user asked for a specific one " +
               "(e.g. 'pie'). Honored as long as the result has a label column + a numeric column. " +

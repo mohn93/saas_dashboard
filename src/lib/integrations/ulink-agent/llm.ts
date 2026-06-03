@@ -1,3 +1,4 @@
+import { CHART_TYPES } from "./types";
 import type {
   AgentExample,
   CatalogColumn,
@@ -315,7 +316,7 @@ export async function generateSql(
   }
   const chart: ChartSpec = parsed.chart
     ? {
-        type: (["bar", "line", "area", "pie", "none"].includes(parsed.chart.type as string)
+        type: ((CHART_TYPES as readonly string[]).includes(parsed.chart.type as string)
           ? parsed.chart.type
           : "none") as ChartSpec["type"],
         xColumn: (parsed.chart.xColumn as string) ?? null,
