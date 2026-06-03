@@ -24,7 +24,6 @@ function reasonerReturning(sql: string): LLMClient {
   const out = `{"sql":${JSON.stringify(sql)},"chart":{"type":"none","xColumn":null,"yColumn":null}}`;
   return {
     model: "r1",
-    complete: vi.fn(),
     chatWithTools: vi.fn(),
     stream: async (_m, h) => {
       h.onContent?.(out);
@@ -38,7 +37,6 @@ function reasonerWithBarChart(sql: string): LLMClient {
   const out = `{"sql":${JSON.stringify(sql)},"chart":{"type":"bar","xColumn":"month","yColumn":"n"}}`;
   return {
     model: "r1",
-    complete: vi.fn(),
     chatWithTools: vi.fn(),
     stream: async (_m, h) => {
       h.onContent?.(out);

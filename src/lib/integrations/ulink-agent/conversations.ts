@@ -1,4 +1,5 @@
 import { getULinkClient } from "@/lib/integrations/ulink/client";
+import { NotFoundError } from "./errors";
 import type { AgentEvent } from "./events";
 import type { AgentMessage } from "./message";
 import { applyEvent, emptyMessage, hydrateMessage } from "./message";
@@ -6,6 +7,18 @@ import type { ConversationSummary } from "./types";
 
 function db() {
   return getULinkClient().schema("pm_agent");
+}
+
+// Throws NotFoundError unless `userEmail` owns conversation `id`.
+async function assertConversationOwner(id: string, userEmail: string): Promise<void> {
+  const { data, error } = await db()
+    .from("conversations")
+    .select("id")
+    .eq("id", id)
+    .eq("created_by_email", userEmail)
+    .maybeSingle();
+  if (error) throw new Error(`assertConversationOwner: ${error.message}`);
+  if (!data) throw new NotFoundError("Conversation not found");
 }
 
 export function deriveTitle(question: string): string {
@@ -25,11 +38,12 @@ export interface ConversationStore {
     payload: AgentMessage;
     userEmail: string | null;
   }): Promise<void>;
-  listConversations(): Promise<ConversationSummary[]>;
+  listConversations(userEmail: string): Promise<ConversationSummary[]>;
   getConversation(
-    id: string
+    id: string,
+    userEmail: string
   ): Promise<{ conversation: ConversationSummary; messages: AgentMessage[] }>;
-  deleteConversation(id: string): Promise<void>;
+  deleteConversation(id: string, userEmail: string): Promise<void>;
 }
 
 function toSummary(r: Record<string, unknown>): ConversationSummary {
@@ -53,6 +67,10 @@ export const conversationStore: ConversationStore = {
   },
 
   async appendMessage({ conversationId, question, payload, userEmail }) {
+    // Don't let a caller append to a conversation they don't own (the id comes
+    // from the client). A conversation just created in persistTurn is owned by
+    // this same userEmail, so the check passes for the new-chat path too.
+    if (userEmail) await assertConversationOwner(conversationId, userEmail);
     const { error } = await db().from("messages").insert({
       conversation_id: conversationId,
       question,
@@ -64,23 +82,26 @@ export const conversationStore: ConversationStore = {
     // (messages_bump_updated_at) on insert — no second round-trip needed.
   },
 
-  async listConversations() {
+  async listConversations(userEmail) {
     const { data, error } = await db()
       .from("conversations")
       .select("id, title, created_by_email, updated_at")
+      .eq("created_by_email", userEmail)
       .order("updated_at", { ascending: false })
       .limit(100);
     if (error) throw new Error(`listConversations: ${error.message}`);
     return (data ?? []).map(toSummary);
   },
 
-  async getConversation(id) {
+  async getConversation(id, userEmail) {
     const { data: conv, error: cErr } = await db()
       .from("conversations")
       .select("id, title, created_by_email, updated_at")
       .eq("id", id)
-      .single();
+      .eq("created_by_email", userEmail)
+      .maybeSingle();
     if (cErr) throw new Error(`getConversation(conversation): ${cErr.message}`);
+    if (!conv) throw new NotFoundError("Conversation not found");
     const { data: rows, error: mErr } = await db()
       .from("messages")
       .select("id, question, payload, created_at")
@@ -95,9 +116,15 @@ export const conversationStore: ConversationStore = {
     };
   },
 
-  async deleteConversation(id) {
-    const { error } = await db().from("conversations").delete().eq("id", id);
+  async deleteConversation(id, userEmail) {
+    const { data, error } = await db()
+      .from("conversations")
+      .delete()
+      .eq("id", id)
+      .eq("created_by_email", userEmail)
+      .select("id");
     if (error) throw new Error(`deleteConversation: ${error.message}`);
+    if (!data || data.length === 0) throw new NotFoundError("Conversation not found");
   },
 };
 

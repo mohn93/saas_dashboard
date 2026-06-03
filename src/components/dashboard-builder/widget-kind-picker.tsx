@@ -1,10 +1,11 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import {
+  SELECTABLE_CHART_TYPES,
+  SELECTABLE_WIDGET_KINDS,
+} from "@/lib/integrations/ulink-agent/types";
 import type { ChartType, WidgetKind } from "@/lib/integrations/ulink-agent/types";
-
-const KINDS: Exclude<WidgetKind, "text">[] = ["table", "chart", "kpi"];
-const CHART_TYPES: ChartType[] = ["bar", "line", "area", "pie"];
 
 export function WidgetKindPicker({
   kind,
@@ -21,13 +22,19 @@ export function WidgetKindPicker({
 }) {
   return (
     <div className="space-y-2">
-      <div className="flex overflow-hidden rounded-md border border-border/50 text-xs">
-        {KINDS.map((k) => {
+      <div
+        role="radiogroup"
+        aria-label="Widget type"
+        className="flex overflow-hidden rounded-md border border-border/50 text-xs"
+      >
+        {SELECTABLE_WIDGET_KINDS.map((k) => {
           const disabled = k === "chart" && !chartable;
           return (
             <button
               key={k}
               type="button"
+              role="radio"
+              aria-checked={kind === k}
               disabled={disabled}
               onClick={() => onKindChange(k)}
               title={disabled ? "Needs a label + a numeric column" : undefined}
@@ -43,11 +50,17 @@ export function WidgetKindPicker({
         })}
       </div>
       {kind === "chart" && (
-        <div className="flex overflow-hidden rounded-md border border-border/50 text-xs">
-          {CHART_TYPES.map((t) => (
+        <div
+          role="radiogroup"
+          aria-label="Chart type"
+          className="flex overflow-hidden rounded-md border border-border/50 text-xs"
+        >
+          {SELECTABLE_CHART_TYPES.map((t) => (
             <button
               key={t}
               type="button"
+              role="radio"
+              aria-checked={chartType === t}
               onClick={() => onChartTypeChange(t)}
               className={cn(
                 "flex-1 px-2 py-1 capitalize",

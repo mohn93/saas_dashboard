@@ -1,13 +1,21 @@
 export const CHART_TYPES = ["bar", "line", "area", "pie", "none"] as const;
 export type ChartType = (typeof CHART_TYPES)[number];
 
+// The chart types a user can actually pick in the UI (everything except the
+// sentinel "none"). Derived from CHART_TYPES so the pickers can never drift
+// from the canonical list / the agent tool enum / the render switch.
+export const SELECTABLE_CHART_TYPES = CHART_TYPES.filter(
+  (t): t is Exclude<ChartType, "none"> => t !== "none"
+);
+
 export interface ChartSpec {
   type: ChartType;
   xColumn: string | null; // label/category column
   yColumn: string | null; // numeric value column
 }
 
-export type DisplayMode = "table" | "chart" | "both";
+export const DISPLAY_MODES = ["table", "chart", "both"] as const;
+export type DisplayMode = (typeof DISPLAY_MODES)[number];
 
 export interface CatalogColumn {
   table: string;
@@ -48,14 +56,15 @@ export interface ConversationTurn {
   answer?: string | null; // the assistant's prior reply/narration, so the agent sees its own thread
 }
 
+// The shape ResultView consumes. Built from a chat message (agent-message) or a
+// pinned widget (widget-body) via buildAnswer(). Carries only what ResultView
+// reads — the per-message logId lives on AgentMessage and is used directly.
 export interface AgentAnswer {
   ok: boolean;
   sql: string | null;
   chart: ChartSpec | null;
   result: QueryResult | null;
   error: string | null;
-  attempts: number;
-  logId: string | null;
 }
 
 export interface QueryLogEntry {
@@ -89,8 +98,15 @@ export interface ConversationSummary {
   updatedAt: string;
 }
 
-export type WidgetKind = "chart" | "table" | "kpi" | "text";
-export type WidgetSize = "sm" | "md" | "full";
+export const WIDGET_KINDS = ["chart", "table", "kpi", "text"] as const;
+export type WidgetKind = (typeof WIDGET_KINDS)[number];
+export const WIDGET_SIZES = ["sm", "md", "full"] as const;
+export type WidgetSize = (typeof WIDGET_SIZES)[number];
+
+// User-selectable widget kinds in their canonical picker order (excludes the
+// internal "text" note kind). Single source for both the add/pin picker and the
+// inline editor so the segmented control can't reorder between the two surfaces.
+export const SELECTABLE_WIDGET_KINDS: Exclude<WidgetKind, "text">[] = ["table", "chart", "kpi"];
 
 export interface Widget {
   id: string;
@@ -102,6 +118,7 @@ export interface Widget {
   question: string | null;
   sql: string | null;
   chart: ChartSpec | null;
+  display: DisplayMode; // how the cached result is presented (chart collapses the table)
   result: QueryResult | null; // from cached_result
   cachedAt: string | null;
   textMd: string | null;

@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const email = await getSessionEmail(request);
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const conversations = await conversationStore.listConversations();
+    const conversations = await conversationStore.listConversations(email);
     return NextResponse.json({ conversations });
   } catch (err) {
     console.error("listConversations failed:", err);

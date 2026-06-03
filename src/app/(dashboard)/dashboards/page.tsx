@@ -33,6 +33,7 @@ export default function DashboardsPage() {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
+          aria-label="New dashboard name"
           placeholder="New dashboard name…"
           className="flex-1 rounded-lg border border-border/50 bg-background px-3 py-2 text-sm outline-none focus:border-violet-500"
         />
@@ -46,7 +47,7 @@ export default function DashboardsPage() {
       </form>
 
       {dashboards.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border/60 p-10 text-center text-sm text-muted-foreground">
+        <div className="rounded-lg border-2 border-dashed border-border/60 p-10 text-center text-sm text-muted-foreground">
           No dashboards yet. Create one above, or pin an answer from the PM Agent.
         </div>
       ) : (

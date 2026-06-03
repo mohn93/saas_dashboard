@@ -1,19 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { AgentEvent } from "@/lib/integrations/ulink-agent/events";
 import type { ConversationTurn, ConversationSummary } from "@/lib/integrations/ulink-agent/types";
 import {
   applyEvent,
   emptyMessage,
   type AgentMessage,
-  type AgentStep,
 } from "@/lib/integrations/ulink-agent/message";
 
 // Re-exported for backward compatibility — prefer importing directly from
 // @/lib/integrations/ulink-agent/message in server-usable code.
 export { applyEvent, emptyMessage };
-export type { AgentMessage, AgentStep };
+export type { AgentMessage };
 
 let counter = 0;
 function nextId(): string {
@@ -26,8 +25,29 @@ export function useAgentStream(
 ) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // Cancellation: each run gets a monotonic token; switching conversations,
+  // starting a new chat, or asking again aborts the in-flight fetch and
+  // invalidates its token so a late stream can't clobber the current view.
+  const abortRef = useRef<AbortController | null>(null);
+  const runRef = useRef(0);
+
+  function cancelInFlight() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    runRef.current += 1; // invalidate any run still in its read loop
+  }
 
   async function ask(question: string) {
+    if (busy) return; // double-submit guard — one stream at a time
+    setBusy(true);
+    cancelInFlight();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const runToken = runRef.current;
+    const isCurrent = () => runRef.current === runToken && !controller.signal.aborted;
+
     const id = nextId();
     const history: ConversationTurn[] = messages
       .filter((m) => !m.loading)
@@ -50,6 +70,7 @@ export function useAgentStream(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question, history, conversationId }),
+        signal: controller.signal,
       });
       if (!res.body) throw new Error("No response stream");
       const reader = res.body.getReader();
@@ -61,8 +82,11 @@ export function useAgentStream(
         try {
           const event = JSON.parse(trimmed) as AgentEvent;
           if (event.type === "conversation") {
-            setConversationId(event.conversationId);
-            onConversation?.({ id: event.conversationId, title: event.title });
+            // Only adopt the conversation id if this run is still the active one.
+            if (isCurrent()) {
+              setConversationId(event.conversationId);
+              onConversation?.({ id: event.conversationId, title: event.title });
+            }
             return;
           }
           update((m) => applyEvent(m, event));
@@ -80,13 +104,20 @@ export function useAgentStream(
       }
       consume(buffer);
       update((m) => (m.loading ? { ...m, loading: false } : m));
-    } catch {
-      update((m) => ({
-        ...m,
-        loading: false,
-        phase: "error",
-        error: m.error ?? "Network error",
-      }));
+    } catch (err) {
+      // An aborted run was superseded on purpose — leave the (now-removed or
+      // replaced) message alone rather than flashing a spurious error.
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        update((m) => ({
+          ...m,
+          loading: false,
+          phase: "error",
+          error: m.error ?? "Network error",
+        }));
+      }
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
+      setBusy(false);
     }
   }
 
@@ -106,6 +137,8 @@ export function useAgentStream(
   }
 
   async function load(id: string) {
+    cancelInFlight(); // a stream from the previous conversation must not bleed in
+    setBusy(false);
     try {
       const res = await fetch(`/api/agent/conversations/${id}`);
       if (!res.ok) return;
@@ -121,9 +154,11 @@ export function useAgentStream(
   }
 
   function newChat() {
+    cancelInFlight();
+    setBusy(false);
     setMessages([]);
     setConversationId(null);
   }
 
-  return { messages, conversationId, ask, sendFeedback, load, newChat };
+  return { messages, conversationId, busy, ask, sendFeedback, load, newChat };
 }

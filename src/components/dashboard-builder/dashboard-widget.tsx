@@ -5,12 +5,14 @@ import { RefreshCw, Trash2, GripVertical, Pencil } from "lucide-react";
 import { WidgetBody } from "./widget-body";
 import { cn } from "@/lib/utils";
 import type { WidgetPatch } from "@/lib/integrations/ulink-agent/widgets";
-import type { Widget, WidgetKind, WidgetSize } from "@/lib/integrations/ulink-agent/types";
+import {
+  SELECTABLE_CHART_TYPES,
+  SELECTABLE_WIDGET_KINDS,
+  WIDGET_SIZES,
+} from "@/lib/integrations/ulink-agent/types";
+import type { Widget, WidgetSize } from "@/lib/integrations/ulink-agent/types";
 
-const SIZES: WidgetSize[] = ["sm", "md", "full"];
 const SIZE_LABEL: Record<WidgetSize, string> = { sm: "S", md: "M", full: "Full" };
-const KINDS: WidgetKind[] = ["chart", "table", "kpi"];
-const CHART_TYPES = ["bar", "line", "area", "pie"] as const;
 
 export function DashboardWidget({
   widget,
@@ -78,11 +80,13 @@ export function DashboardWidget({
       {editing && (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3 text-xs">
           {/* size */}
-          <div className="flex overflow-hidden rounded-md border border-border/50">
-            {SIZES.map((s) => (
+          <div role="radiogroup" aria-label="Widget size" className="flex overflow-hidden rounded-md border border-border/50">
+            {WIDGET_SIZES.map((s) => (
               <button
                 key={s}
                 type="button"
+                role="radio"
+                aria-checked={widget.size === s}
                 onClick={() => onPatch({ size: s })}
                 className={cn("px-2 py-1", widget.size === s ? "bg-violet-600 text-white" : "hover:bg-accent")}
               >
@@ -93,11 +97,13 @@ export function DashboardWidget({
 
           {/* render kind (query widgets only) */}
           {isQuery && (
-            <div className="flex overflow-hidden rounded-md border border-border/50">
-              {KINDS.map((k) => (
+            <div role="radiogroup" aria-label="Widget type" className="flex overflow-hidden rounded-md border border-border/50">
+              {SELECTABLE_WIDGET_KINDS.map((k) => (
                 <button
                   key={k}
                   type="button"
+                  role="radio"
+                  aria-checked={widget.kind === k}
                   onClick={() => onPatch({ kind: k })}
                   className={cn("px-2 py-1 capitalize", widget.kind === k ? "bg-violet-600 text-white" : "hover:bg-accent")}
                 >
@@ -109,11 +115,13 @@ export function DashboardWidget({
 
           {/* chart type (chart kind only) */}
           {widget.kind === "chart" && (
-            <div className="flex overflow-hidden rounded-md border border-border/50">
-              {CHART_TYPES.map((t) => (
+            <div role="radiogroup" aria-label="Chart type" className="flex overflow-hidden rounded-md border border-border/50">
+              {SELECTABLE_CHART_TYPES.map((t) => (
                 <button
                   key={t}
                   type="button"
+                  role="radio"
+                  aria-checked={widget.chart?.type === t}
                   onClick={() =>
                     onPatch({ chart: { type: t, xColumn: widget.chart?.xColumn ?? null, yColumn: widget.chart?.yColumn ?? null } })
                   }

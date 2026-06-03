@@ -13,10 +13,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { hasUsableChart, MAX_CACHED_ROWS } from "@/lib/integrations/ulink-agent/widgets";
 import type { AgentAnswer, DisplayMode } from "@/lib/integrations/ulink-agent/types";
 
 const COLLAPSED_ROWS = 4;
-const MAX_ROWS = 100;
+// The table never shows more rows than the store caches, so the UI cap tracks
+// the persist cap (one source) instead of a separate literal that can drift.
+const MAX_ROWS = MAX_CACHED_ROWS;
 
 // ISO date or datetime, e.g. "2026-05-06" or "2026-05-06T04:44:25.000Z".
 const ISO_DATE_RE =
@@ -41,6 +44,8 @@ function renderCell(value: unknown) {
       return (
         <span
           title={exact}
+          aria-label={exact}
+          tabIndex={0}
           className="cursor-help whitespace-nowrap underline decoration-dotted decoration-muted-foreground/40 underline-offset-2"
         >
           {display}
@@ -110,9 +115,7 @@ function TruncatedCell({ value }: { value: unknown }) {
 
 function Chart({ answer }: { answer: AgentAnswer }) {
   const { chart, result } = answer;
-  if (!chart || chart.type === "none" || !chart.xColumn || !chart.yColumn || !result) {
-    return null;
-  }
+  if (!result || !hasUsableChart(chart)) return null;
   const xCol = chart.xColumn;
   const yCol = chart.yColumn;
   const data = result.rows.map((r) => ({
@@ -121,21 +124,24 @@ function Chart({ answer }: { answer: AgentAnswer }) {
   }));
   const categories: string[] = [yCol];
 
-  if (chart.type === "pie")
-    return (
-      <DonutChart
-        data={data}
-        category={yCol}
-        index={xCol}
-        variant="pie"
-        className="h-64 mt-4"
-      />
-    );
-  if (chart.type === "line")
-    return <LineChart data={data} index={xCol} categories={categories} className="h-64 mt-4" />;
-  if (chart.type === "area")
-    return <AreaChart data={data} index={xCol} categories={categories} className="h-64 mt-4" />;
-  return <BarChart data={data} index={xCol} categories={categories} className="h-64 mt-4" />;
+  let el: JSX.Element;
+  if (chart.type === "pie") {
+    el = <DonutChart data={data} category={yCol} index={xCol} variant="pie" className="h-64 mt-4" />;
+  } else if (chart.type === "line") {
+    el = <LineChart data={data} index={xCol} categories={categories} className="h-64 mt-4" />;
+  } else if (chart.type === "area") {
+    el = <AreaChart data={data} index={xCol} categories={categories} className="h-64 mt-4" />;
+  } else {
+    el = <BarChart data={data} index={xCol} categories={categories} className="h-64 mt-4" />;
+  }
+
+  // Charts render as SVG with no inherent text alternative; give the whole
+  // chart an accessible name so a chart-only answer isn't silent to a SR.
+  return (
+    <div role="img" aria-label={`${chart.type} chart: ${yCol} by ${xCol}`}>
+      {el}
+    </div>
+  );
 }
 
 export function ResultView({

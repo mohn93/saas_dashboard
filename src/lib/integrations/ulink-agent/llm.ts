@@ -4,7 +4,6 @@ import type {
   CatalogColumn,
   CatalogForeignKey,
   ChartSpec,
-  ConversationTurn,
 } from "./types";
 
 export interface LLMMessage {
@@ -50,7 +49,6 @@ export interface StreamHandlers {
 
 export interface LLMClient {
   model: string;
-  complete(messages: LLMMessage[]): Promise<string>;
   stream(messages: LLMMessage[], handlers: StreamHandlers): Promise<string>;
   chatWithTools(messages: LLMToolMessage[], tools: ToolDef[]): Promise<ToolChatResult>;
 }
@@ -106,23 +104,6 @@ function buildClient(model: string): LLMClient {
 
   return {
     model,
-    async complete(messages: LLMMessage[]): Promise<string> {
-      const res = await fetch(`${baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ model, messages, temperature: 0, stream: false }),
-      });
-      if (!res.ok) {
-        throw new Error(`LLM request failed: ${res.status} ${await res.text()}`);
-      }
-      const json = await res.json();
-      const content = json?.choices?.[0]?.message?.content;
-      if (typeof content !== "string") throw new Error("LLM returned no content");
-      return content;
-    },
     async stream(messages: LLMMessage[], handlers: StreamHandlers): Promise<string> {
       const res = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
@@ -227,8 +208,6 @@ export interface GenerateSqlInput {
   columns: CatalogColumn[];
   foreignKeys: CatalogForeignKey[];
   examples: AgentExample[];
-  history?: ConversationTurn[];
-  priorError?: string | null;
   chartHint?: ChartSpec["type"]; // caller-requested chart type (e.g. the user asked for a pie)
 }
 
@@ -257,17 +236,6 @@ export async function generateSql(
   const examples = input.examples
     .map((e) => `Q: ${e.question}\nSQL: ${e.sql}`)
     .join("\n\n");
-  const history = (input.history ?? [])
-    .map((h) =>
-      h.ok
-        ? `Earlier question: ${h.question}` +
-          (h.sql ? `\nSQL used: ${h.sql}` : "") +
-          (h.answer ? `\nAssistant answered: ${h.answer}` : "")
-        : `Earlier question: ${h.question}\nThat attempt FAILED` +
-          (h.error ? ` (error: ${h.error})` : "") +
-          (h.sql ? `\nFailed SQL: ${h.sql}` : "")
-    )
-    .join("\n\n");
 
   const messages: LLMMessage[] = [
     {
@@ -275,9 +243,7 @@ export async function generateSql(
       content:
         "You translate a question into ONE read-only PostgreSQL SELECT. " +
         "Never write data (no INSERT/UPDATE/DELETE/DDL). Use only the given columns. " +
-        "If the user message is a follow-up (e.g. 'try again', 'fix it', or 'now by month'), " +
-        "use 'Conversation so far' to recover the actual data question and answer THAT — " +
-        "if an earlier attempt FAILED, re-attempt the same intent. " +
+        "The question is already self-contained (the orchestrator resolves any follow-up before calling you). " +
         "Always return a real analytical query against the schema; never a placeholder like SELECT 'ok'. " +
         "When checking whether a specific entity exists or matches an identifier (slug/email/id), " +
         "filter in WHERE so the query returns ZERO rows when there is no match; do NOT use scalar " +
@@ -294,7 +260,6 @@ export async function generateSql(
       role: "user",
       content:
         `Question: ${input.question}\n\n` +
-        (history ? `Conversation so far:\n${history}\n\n` : "") +
         `Columns:\n${cols}\n\n` +
         (fks ? `Foreign keys:\n${fks}\n\n` : "") +
         (examples ? `Proven examples:\n${examples}\n\n` : "") +
@@ -302,9 +267,6 @@ export async function generateSql(
           ? `The user wants a ${input.chartHint} chart. REQUIRED: shape the SELECT to return a label ` +
             `column and a numeric value column, and set chart.type to "${input.chartHint}" with ` +
             `xColumn = the label and yColumn = the numeric value.\n`
-          : "") +
-        (input.priorError
-          ? `Your previous SQL failed with: ${input.priorError}\nFix it.\n`
           : ""),
     },
   ];

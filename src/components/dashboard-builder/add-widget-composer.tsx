@@ -55,9 +55,12 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
       question: message.question,
       sql: message.sql,
       result: message.result,
-      title: title || message.question,
+      // Pass only the user-entered title; widgetFromAnswer derives a truncated
+      // title from the question when it's blank (same as the pin-to-dashboard flow).
+      title,
       size,
       kind,
+      display: message.display,
       chart: resolveWidgetChart(message.result, message.chart, kind, chartType),
     });
     try {
@@ -75,6 +78,7 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
       kind: "text",
       title: title.trim() || "Note",
       size,
+      display: "table", // unused for text widgets (rendered from textMd)
       question: null,
       sql: null,
       chart: null,
@@ -98,6 +102,7 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
         title: title || message.question,
         position: 0,
         size,
+        display: kind === "chart" ? message.display : "table",
         question: message.question,
         sql: message.sql,
         chart: resolveWidgetChart(message.result, message.chart, kind, chartType),
@@ -160,6 +165,7 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
             <input
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
+              aria-label="Question for the agent"
               placeholder="e.g. signups per week over the last 8 weeks"
               className="flex-1 rounded-lg border border-border/50 bg-background px-3 py-2 text-sm outline-none focus:border-violet-500"
             />
@@ -195,6 +201,7 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  aria-label="Widget title"
                   placeholder={message.question}
                   className="flex-1 rounded-lg border border-border/50 bg-background px-3 py-1.5 text-sm outline-none focus:border-violet-500"
                 />
@@ -218,12 +225,14 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            aria-label="Note title"
             placeholder="Note title"
             className="w-full rounded-lg border border-border/50 bg-background px-3 py-2 text-sm outline-none focus:border-violet-500"
           />
           <textarea
             value={textBody}
             onChange={(e) => setTextBody(e.target.value)}
+            aria-label="Note body"
             placeholder="Write a note…"
             rows={3}
             className="w-full rounded-lg border border-border/50 bg-background px-3 py-2 text-sm outline-none focus:border-violet-500"
@@ -258,7 +267,8 @@ function SizePicker({ size, onChange }: { size: WidgetSize; onChange: (s: Widget
           key={s.k}
           type="button"
           onClick={() => onChange(s.k)}
-          className={size === s.k ? "bg-violet-600 px-2 py-1.5 text-white" : "px-2 py-1.5 hover:bg-accent"}
+          aria-pressed={size === s.k}
+          className={size === s.k ? "bg-violet-600 px-2 py-1 text-white" : "px-2 py-1 hover:bg-accent"}
         >
           {s.label}
         </button>

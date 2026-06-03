@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { ResultView } from "@/components/agent/result-view";
 import { Markdown } from "@/components/agent/markdown";
 import { stripMarkdownTables } from "@/lib/markdown-utils";
+import { buildAnswer } from "@/lib/integrations/ulink-agent/widgets";
 import { PinToDashboard } from "@/components/agent/pin-to-dashboard";
 import type { AgentMessage as AgentMessageType } from "@/hooks/use-agent-stream";
 import type { AgentAnswer } from "@/lib/integrations/ulink-agent/types";
@@ -34,15 +35,7 @@ export function AgentMessage({
   const panelOpen = userToggled ? open : !finished;
 
   const resultAnswer: AgentAnswer | null = message.result
-    ? {
-        ok: true,
-        sql: message.sql,
-        chart: message.chart,
-        result: message.result,
-        error: null,
-        attempts: 0,
-        logId: message.logId,
-      }
+    ? buildAnswer({ sql: message.sql, chart: message.chart, result: message.result })
     : null;
 
   // Strip any inline markdown table from the narration when the result table renders below it.
@@ -119,15 +112,23 @@ export function AgentMessage({
             <>
               <button
                 onClick={() => onFeedback(message.id, message.logId!, true)}
-                className={cn("rounded-md p-1.5 hover:bg-accent", message.feedback === "up" && "text-green-400")}
                 aria-label="Helpful"
+                aria-pressed={message.feedback === "up"}
+                className={cn(
+                  "rounded-md p-1.5 hover:bg-accent",
+                  message.feedback === "up" && "bg-green-500/15 text-green-400"
+                )}
               >
                 <ThumbsUp className="h-4 w-4" />
               </button>
               <button
                 onClick={() => onFeedback(message.id, message.logId!, false)}
-                className={cn("rounded-md p-1.5 hover:bg-accent", message.feedback === "down" && "text-red-400")}
                 aria-label="Not helpful"
+                aria-pressed={message.feedback === "down"}
+                className={cn(
+                  "rounded-md p-1.5 hover:bg-accent",
+                  message.feedback === "down" && "bg-red-500/15 text-red-400"
+                )}
               >
                 <ThumbsDown className="h-4 w-4" />
               </button>

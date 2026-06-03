@@ -1,11 +1,13 @@
 import { getULinkClient } from "@/lib/integrations/ulink/client";
 import { executeReadOnly } from "./client";
+import { NotFoundError } from "./errors";
 import { validateSelect } from "./validate";
 import { capRows } from "./widgets";
 import type { WidgetCreateInput, WidgetPatch } from "./widgets";
 import type {
   ChartSpec,
   DashboardSummary,
+  DisplayMode,
   QueryResult,
   Widget,
 } from "./types";
@@ -14,17 +16,59 @@ function db() {
   return getULinkClient().schema("pm_agent");
 }
 
+// Every method below runs under the service-role client (bypasses RLS), so
+// authorization is enforced here in code: list/read/mutate are scoped to the
+// authenticated user's own rows, and widget operations are authorized through
+// the owning dashboard (a widget's own created_by_email is historically
+// nullable and not trustworthy). A missing OR not-owned row throws
+// NotFoundError, which routes map to 404 (so ownership can't be probed).
 export interface DashboardStore {
-  listDashboards(): Promise<DashboardSummary[]>;
+  listDashboards(userEmail: string): Promise<DashboardSummary[]>;
   createDashboard(input: { name: string; userEmail: string | null }): Promise<{ id: string }>;
-  getDashboard(id: string): Promise<{ dashboard: DashboardSummary; widgets: Widget[] }>;
-  renameDashboard(id: string, name: string): Promise<void>;
-  deleteDashboard(id: string): Promise<void>;
-  createWidget(dashboardId: string, input: WidgetCreateInput): Promise<{ id: string }>;
-  updateWidget(id: string, patch: WidgetPatch): Promise<void>;
-  deleteWidget(id: string): Promise<void>;
-  reorderWidgets(positions: Record<string, number>): Promise<void>;
-  refreshWidget(id: string): Promise<QueryResult>;
+  getDashboard(
+    id: string,
+    userEmail: string
+  ): Promise<{ dashboard: DashboardSummary; widgets: Widget[] }>;
+  renameDashboard(id: string, name: string, userEmail: string): Promise<void>;
+  deleteDashboard(id: string, userEmail: string): Promise<void>;
+  createWidget(
+    dashboardId: string,
+    input: WidgetCreateInput,
+    userEmail: string
+  ): Promise<{ id: string }>;
+  updateWidget(id: string, patch: WidgetPatch, userEmail: string): Promise<void>;
+  deleteWidget(id: string, userEmail: string): Promise<void>;
+  reorderWidgets(
+    dashboardId: string,
+    positions: Record<string, number>,
+    userEmail: string
+  ): Promise<void>;
+  refreshWidget(id: string, userEmail: string): Promise<QueryResult>;
+}
+
+// Throws NotFoundError unless `userEmail` owns dashboard `id`.
+async function assertDashboardOwner(id: string, userEmail: string): Promise<void> {
+  const { data, error } = await db()
+    .from("dashboards")
+    .select("id")
+    .eq("id", id)
+    .eq("created_by_email", userEmail)
+    .maybeSingle();
+  if (error) throw new Error(`assertDashboardOwner: ${error.message}`);
+  if (!data) throw new NotFoundError("Dashboard not found");
+}
+
+// Throws NotFoundError unless `userEmail` owns the dashboard that widget `id`
+// belongs to (authorized through the FK, not the widget's own column).
+async function assertWidgetOwner(id: string, userEmail: string): Promise<void> {
+  const { data, error } = await db()
+    .from("widgets")
+    .select("id, dashboards!inner(created_by_email)")
+    .eq("id", id)
+    .eq("dashboards.created_by_email", userEmail)
+    .maybeSingle();
+  if (error) throw new Error(`assertWidgetOwner: ${error.message}`);
+  if (!data) throw new NotFoundError("Widget not found");
 }
 
 function toDashboardSummary(r: Record<string, unknown>): DashboardSummary {
@@ -49,6 +93,7 @@ function toWidget(r: Record<string, unknown>): Widget {
     question: (r.question as string | null) ?? null,
     sql: (r.sql as string | null) ?? null,
     chart: (r.chart_spec as ChartSpec | null) ?? null,
+    display: (r.display as DisplayMode | null) ?? "both",
     result: (r.cached_result as QueryResult | null) ?? null,
     cachedAt: (r.cached_at as string | null) ?? null,
     textMd: (r.text_md as string | null) ?? null,
@@ -57,10 +102,11 @@ function toWidget(r: Record<string, unknown>): Widget {
 }
 
 export const dashboardStore: DashboardStore = {
-  async listDashboards() {
+  async listDashboards(userEmail) {
     const { data, error } = await db()
       .from("dashboards")
       .select("id, name, created_by_email, updated_at, widgets(count)")
+      .eq("created_by_email", userEmail)
       .order("updated_at", { ascending: false })
       .limit(100);
     if (error) throw new Error(`listDashboards: ${error.message}`);
@@ -77,17 +123,19 @@ export const dashboardStore: DashboardStore = {
     return { id: data!.id as string };
   },
 
-  async getDashboard(id) {
+  async getDashboard(id, userEmail) {
     const { data: dash, error: dErr } = await db()
       .from("dashboards")
       .select("id, name, created_by_email, updated_at, widgets(count)")
       .eq("id", id)
-      .single();
+      .eq("created_by_email", userEmail)
+      .maybeSingle();
     if (dErr) throw new Error(`getDashboard(dashboard): ${dErr.message}`);
+    if (!dash) throw new NotFoundError("Dashboard not found");
     const { data: rows, error: wErr } = await db()
       .from("widgets")
       .select(
-        "id, dashboard_id, kind, title, position, size, question, sql, chart_spec, cached_result, cached_at, text_md, created_by_email"
+        "id, dashboard_id, kind, title, position, size, display, question, sql, chart_spec, cached_result, cached_at, text_md, created_by_email"
       )
       .eq("dashboard_id", id)
       .order("position", { ascending: true });
@@ -98,17 +146,30 @@ export const dashboardStore: DashboardStore = {
     };
   },
 
-  async renameDashboard(id, name) {
-    const { error } = await db().from("dashboards").update({ name }).eq("id", id);
+  async renameDashboard(id, name, userEmail) {
+    const { data, error } = await db()
+      .from("dashboards")
+      .update({ name })
+      .eq("id", id)
+      .eq("created_by_email", userEmail)
+      .select("id");
     if (error) throw new Error(`renameDashboard: ${error.message}`);
+    if (!data || data.length === 0) throw new NotFoundError("Dashboard not found");
   },
 
-  async deleteDashboard(id) {
-    const { error } = await db().from("dashboards").delete().eq("id", id);
+  async deleteDashboard(id, userEmail) {
+    const { data, error } = await db()
+      .from("dashboards")
+      .delete()
+      .eq("id", id)
+      .eq("created_by_email", userEmail)
+      .select("id");
     if (error) throw new Error(`deleteDashboard: ${error.message}`);
+    if (!data || data.length === 0) throw new NotFoundError("Dashboard not found");
   },
 
-  async createWidget(dashboardId, input) {
+  async createWidget(dashboardId, input, userEmail) {
+    await assertDashboardOwner(dashboardId, userEmail);
     // position defaults to current max + 1
     const { data: last, error: pErr } = await db()
       .from("widgets")
@@ -128,12 +189,14 @@ export const dashboardStore: DashboardStore = {
         title: input.title,
         position,
         size: input.size,
+        display: input.display,
         question: input.question,
         sql: input.sql,
         chart_spec: input.chart,
         cached_result: input.result,
         cached_at: hasResult ? new Date().toISOString() : null,
         text_md: input.textMd,
+        created_by_email: userEmail,
       })
       .select("id")
       .single();
@@ -141,11 +204,13 @@ export const dashboardStore: DashboardStore = {
     return { id: data!.id as string };
   },
 
-  async updateWidget(id, patch) {
+  async updateWidget(id, patch, userEmail) {
+    await assertWidgetOwner(id, userEmail);
     const row: Record<string, unknown> = {};
     if (patch.title !== undefined) row.title = patch.title;
     if (patch.size !== undefined) row.size = patch.size;
     if (patch.kind !== undefined) row.kind = patch.kind;
+    if (patch.display !== undefined) row.display = patch.display;
     if (patch.chart !== undefined) row.chart_spec = patch.chart;
     if (patch.textMd !== undefined) row.text_md = patch.textMd;
     if (patch.position !== undefined) row.position = patch.position;
@@ -159,12 +224,14 @@ export const dashboardStore: DashboardStore = {
     if (error) throw new Error(`updateWidget: ${error.message}`);
   },
 
-  async deleteWidget(id) {
+  async deleteWidget(id, userEmail) {
+    await assertWidgetOwner(id, userEmail);
     const { error } = await db().from("widgets").delete().eq("id", id);
     if (error) throw new Error(`deleteWidget: ${error.message}`);
   },
 
-  async reorderWidgets(positions) {
+  async reorderWidgets(dashboardId, positions, userEmail) {
+    await assertDashboardOwner(dashboardId, userEmail);
     const entries = Object.entries(positions);
     await Promise.all(
       entries.map(([id, position]) =>
@@ -172,6 +239,7 @@ export const dashboardStore: DashboardStore = {
           .from("widgets")
           .update({ position })
           .eq("id", id)
+          .eq("dashboard_id", dashboardId)
           .then(({ error }) => {
             if (error) throw new Error(`reorderWidgets(${id}): ${error.message}`);
           })
@@ -179,7 +247,8 @@ export const dashboardStore: DashboardStore = {
     );
   },
 
-  async refreshWidget(id) {
+  async refreshWidget(id, userEmail) {
+    await assertWidgetOwner(id, userEmail);
     const { data: w, error } = await db()
       .from("widgets")
       .select("sql")
