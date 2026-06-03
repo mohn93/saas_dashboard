@@ -37,6 +37,20 @@ export function axisLabel(value: unknown): string {
   return value == null ? "" : String(value);
 }
 
+// Labels for a chart's category (x) axis. Prefer the clean date-only form for
+// ISO dates, but only if that doesn't collapse distinct rows onto the same
+// label (e.g. several intraday timestamps on the same calendar day). On a
+// collision, fall back to the fuller humanized form per row — still never the
+// raw ISO — so chart points/slices stay distinct.
+export function chartLabels(values: unknown[]): string[] {
+  const dateOnly = values.map(axisLabel);
+  if (new Set(dateOnly).size === dateOnly.length) return dateOnly;
+  return values.map((v) => {
+    const h = humanizeIsoDate(v);
+    return h ? h.display : v == null ? "" : String(v);
+  });
+}
+
 export interface PageBounds {
   page: number; // clamped page index (0-based)
   pageCount: number; // total number of pages (>= 1)

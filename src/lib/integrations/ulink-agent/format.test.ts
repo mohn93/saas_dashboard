@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { humanizeIsoDate, axisLabel, pageBounds } from "./format";
+import { humanizeIsoDate, axisLabel, chartLabels, pageBounds } from "./format";
 
 describe("humanizeIsoDate", () => {
   it("humanizes a date-only ISO string without a time", () => {
@@ -43,6 +43,33 @@ describe("axisLabel", () => {
   it("renders null/undefined as an empty label", () => {
     expect(axisLabel(null)).toBe("");
     expect(axisLabel(undefined)).toBe("");
+  });
+});
+
+describe("chartLabels", () => {
+  it("uses clean date-only labels for distinct day buckets", () => {
+    // The exact case from the PM screenshot: midnight-bucket datetimes per day.
+    expect(
+      chartLabels([
+        "2025-08-29T00:00:00.000Z",
+        "2025-10-26T00:00:00.000Z",
+        "2026-02-22T00:00:00.000Z",
+      ])
+    ).toEqual(["Aug 29, 2025", "Oct 26, 2025", "Feb 22, 2026"]);
+  });
+
+  it("falls back to the fuller (timed) label when date-only would collide", () => {
+    // Two timestamps on the same calendar day must not collapse to one label.
+    const out = chartLabels([
+      "2026-05-06T09:00:00.000Z",
+      "2026-05-06T15:00:00.000Z",
+    ]);
+    expect(new Set(out).size).toBe(2);
+    out.forEach((l) => expect(l).toMatch(/May 6, 2026/));
+  });
+
+  it("passes non-date categories through unchanged", () => {
+    expect(chartLabels(["booker", "alpona", "xxx"])).toEqual(["booker", "alpona", "xxx"]);
   });
 });
 

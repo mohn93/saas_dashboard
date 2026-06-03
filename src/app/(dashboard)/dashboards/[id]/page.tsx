@@ -61,7 +61,7 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: question.trim(), history: [], persist: false }),
       });
-      if (!res.body) {
+      if (!res.ok || !res.body) {
         setEditError("Couldn't reach the agent. Try again.");
         return;
       }
@@ -77,8 +77,16 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
         try {
           const e = JSON.parse(t) as { type: string; [k: string]: unknown };
           if (e.type === "sql") sql = e.sql as string;
-          if (e.type === "result") {
-            result = { columns: e.columns, rows: e.rows, rowCount: e.rowCount } as QueryResult;
+          // Guard the result shape: the optimistic widget update happens before
+          // the server re-validates, so a malformed event must not store a
+          // result whose .rows is missing (which would crash the table).
+          if (
+            e.type === "result" &&
+            Array.isArray(e.columns) &&
+            Array.isArray(e.rows) &&
+            typeof e.rowCount === "number"
+          ) {
+            result = { columns: e.columns as string[], rows: e.rows as Record<string, unknown>[], rowCount: e.rowCount };
             chart = (e.chart ?? null) as ChartSpec | null;
           }
         } catch {
@@ -101,6 +109,10 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
       }
       await updateWidget(id, { question: question.trim(), sql, chart, result });
       setEditTarget(null);
+    } catch {
+      // Network/stream failure mid-flight — surface it instead of letting the
+      // void-called promise reject unhandled and snap the modal back to idle.
+      setEditError("The agent request failed. Try again.");
     } finally {
       setEditBusy(false);
     }

@@ -6,7 +6,7 @@ import { BarChart, LineChart, AreaChart, DonutChart } from "@tremor/react";
 import { Dialog, DialogTrigger, DialogContent } from "@/components/ui/dialog";
 import { PaginatedTable } from "./data-table";
 import { hasUsableChart } from "@/lib/integrations/ulink-agent/widgets";
-import { axisLabel } from "@/lib/integrations/ulink-agent/format";
+import { chartLabels } from "@/lib/integrations/ulink-agent/format";
 import type { AgentAnswer, DisplayMode } from "@/lib/integrations/ulink-agent/types";
 
 // Rows shown per page inline vs. in the expanded fullscreen view.
@@ -37,9 +37,11 @@ function Chart({ answer }: { answer: AgentAnswer }) {
   const xCol = chart.xColumn;
   const yCol = chart.yColumn;
   // Humanize the x value (ISO dates → "Aug 29, 2025") so axis ticks and tooltips
-  // never show raw "2025-08-29T00:00:00.000Z".
-  const data = result.rows.map((r) => ({
-    [xCol]: axisLabel(r[xCol]),
+  // never show raw "2025-08-29T00:00:00.000Z". chartLabels keeps labels distinct
+  // (won't collapse intraday rows onto a shared day) so points/slices don't merge.
+  const xLabels = chartLabels(result.rows.map((r) => r[xCol]));
+  const data = result.rows.map((r, i) => ({
+    [xCol]: xLabels[i],
     [yCol]: Number(r[yCol]) || 0,
   }));
   const categories: string[] = [yCol];

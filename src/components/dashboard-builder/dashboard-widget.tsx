@@ -30,7 +30,10 @@ function kindPatch(kind: WidgetKind, widget: Widget): WidgetPatch {
   const display = widget.display === "both" ? "both" : "chart";
   if (hasUsableChart(widget.chart)) return { kind, display };
   const inferred = inferChartSpec(widget.result, initialChartType(widget.chart));
-  return { kind, display, chart: inferred ?? widget.chart };
+  // If the result can't be charted, keep the table visible ("both") so the
+  // widget isn't blank (no chart + collapsed table).
+  if (!inferred) return { kind, display: "both", chart: widget.chart };
+  return { kind, display, chart: inferred };
 }
 
 export function DashboardWidget({
