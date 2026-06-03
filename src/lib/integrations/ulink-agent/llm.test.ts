@@ -75,6 +75,19 @@ describe("generateSql", () => {
     expect(out.chart.xColumn).toBe("p");
     expect(out.chart.yColumn).toBe("n");
   });
+
+  it("coerces an unknown chart type to none", async () => {
+    const llm = stubLLM(
+      '{"sql":"SELECT 1 AS n","chart":{"type":"scatter","xColumn":"a","yColumn":"n"}}'
+    );
+    const out = await generateSql(llm, {
+      question: "scatter please",
+      columns: [],
+      foreignKeys: [],
+      examples: [],
+    });
+    expect(out.chart.type).toBe("none");
+  });
 });
 
 
