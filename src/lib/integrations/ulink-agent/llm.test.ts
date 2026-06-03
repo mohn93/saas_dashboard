@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractJson, selectTables, generateSql, parseSseLine, planMessage } from "./llm";
+import { extractJson, generateSql, parseSseLine, parseToolCalls } from "./llm";
 import type { LLMClient } from "./llm";
 
 function stubLLM(response: string): LLMClient {
@@ -10,6 +10,7 @@ function stubLLM(response: string): LLMClient {
       handlers.onContent?.(response);
       return response;
     },
+    chatWithTools: async () => ({ content: null, toolCalls: [] }),
   };
 }
 
@@ -25,24 +26,6 @@ describe("extractJson", () => {
   });
 });
 
-describe("selectTables", () => {
-  it("returns the intersection with known tables", async () => {
-    const llm = stubLLM('["users", "unknown_table"]');
-    const out = await selectTables(llm, "how many users", [
-      { table: "users", description: null },
-      { table: "projects", description: null },
-    ]);
-    expect(out).toEqual(["users"]);
-  });
-
-  it("falls back to all tables when parsing fails", async () => {
-    const llm = stubLLM("not json");
-    const out = await selectTables(llm, "q", [
-      { table: "users", description: null },
-    ]);
-    expect(out).toEqual(["users"]);
-  });
-});
 
 describe("parseSseLine", () => {
   it("parses a content delta", () => {
@@ -79,24 +62,6 @@ describe("generateSql", () => {
   });
 });
 
-describe("planMessage", () => {
-  it("classifies a data question", async () => {
-    const llm = stubLLM('{"kind":"data"}');
-    const out = await planMessage(llm, "how many links?", [], [{ table: "links", description: null }]);
-    expect(out.kind).toBe("data");
-  });
-  it("classifies chat and returns a reply", async () => {
-    const llm = stubLLM('{"kind":"chat","reply":"Hi! Ask me about ULink data."}');
-    const out = await planMessage(llm, "hello", [], []);
-    expect(out.kind).toBe("chat");
-    expect(out.reply).toContain("Hi");
-  });
-  it("falls back to data on parse failure", async () => {
-    const llm = stubLLM("not json");
-    const out = await planMessage(llm, "x", [], []);
-    expect(out.kind).toBe("data");
-  });
-});
 
 describe("generateSql streaming", () => {
   it("emits reasoning deltas and returns sql", async () => {
@@ -110,6 +75,7 @@ describe("generateSql streaming", () => {
         h.onContent?.(out);
         return out;
       },
+      chatWithTools: async () => ({ content: null, toolCalls: [] }),
     };
     const gen = await generateSql(
       llm,
@@ -118,5 +84,36 @@ describe("generateSql streaming", () => {
     );
     expect(gen.sql).toContain("SELECT 1");
     expect(reasoningSeen).toContain("let me think");
+  });
+});
+
+describe("parseToolCalls", () => {
+  it("extracts tool calls from an assistant message", () => {
+    const out = parseToolCalls({
+      content: null,
+      tool_calls: [
+        { id: "c1", type: "function", function: { name: "query", arguments: '{"question":"how many links?"}' } },
+      ],
+    });
+    expect(out.content).toBeNull();
+    expect(out.toolCalls).toHaveLength(1);
+    expect(out.toolCalls[0]).toEqual({ id: "c1", name: "query", arguments: '{"question":"how many links?"}' });
+  });
+
+  it("returns content and no tool calls for a plain answer", () => {
+    const out = parseToolCalls({ content: "You have 5 links." });
+    expect(out.content).toBe("You have 5 links.");
+    expect(out.toolCalls).toEqual([]);
+  });
+
+  it("drops malformed tool calls (missing id or name) and defaults arguments", () => {
+    const out = parseToolCalls({
+      content: null,
+      tool_calls: [
+        { id: "", function: { name: "query", arguments: "{}" } }, // no id → dropped
+        { id: "c2", function: { name: "clarify" } }, // no arguments → "{}"
+      ],
+    });
+    expect(out.toolCalls).toEqual([{ id: "c2", name: "clarify", arguments: "{}" }]);
   });
 });

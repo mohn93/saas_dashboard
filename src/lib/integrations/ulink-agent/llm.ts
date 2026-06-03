@@ -4,13 +4,42 @@ import type {
   CatalogForeignKey,
   ChartSpec,
   ConversationTurn,
-  QueryResult,
-  TableSummary,
 } from "./types";
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant";
   content: string;
+}
+
+export interface LLMToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+
+// Message shape for the tool-calling protocol (adds the `tool` role + tool_calls).
+export interface LLMToolMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_call_id?: string;
+  tool_calls?: LLMToolCall[];
+}
+
+// OpenAI-style tool definition.
+export interface ToolDef {
+  type: "function";
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+}
+
+export interface ParsedToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+export interface ToolChatResult {
+  content: string | null;
+  toolCalls: ParsedToolCall[];
 }
 
 export interface StreamHandlers {
@@ -22,6 +51,29 @@ export interface LLMClient {
   model: string;
   complete(messages: LLMMessage[]): Promise<string>;
   stream(messages: LLMMessage[], handlers: StreamHandlers): Promise<string>;
+  chatWithTools(messages: LLMToolMessage[], tools: ToolDef[]): Promise<ToolChatResult>;
+}
+
+// Pure: normalize a /chat/completions assistant message into content + tool calls.
+export function parseToolCalls(message: {
+  content?: unknown;
+  tool_calls?: unknown;
+}): ToolChatResult {
+  const raw = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
+  const toolCalls: ParsedToolCall[] = raw
+    .map((tc: Record<string, unknown>) => {
+      const fn = (tc?.function ?? {}) as Record<string, unknown>;
+      return {
+        id: typeof tc?.id === "string" ? tc.id : "",
+        name: typeof fn?.name === "string" ? fn.name : "",
+        arguments: typeof fn?.arguments === "string" ? fn.arguments : "{}",
+      };
+    })
+    .filter((tc: ParsedToolCall) => tc.id !== "" && tc.name !== "");
+  return {
+    content: typeof message?.content === "string" ? message.content : null,
+    toolCalls,
+  };
 }
 
 // Parse one SSE line ("data: {json}") into content/reasoning deltas.
@@ -106,6 +158,31 @@ function buildClient(model: string): LLMClient {
       handle(buffer);
       return full;
     },
+    async chatWithTools(
+      messages: LLMToolMessage[],
+      tools: ToolDef[]
+    ): Promise<ToolChatResult> {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          tools,
+          tool_choice: "auto",
+          temperature: 0,
+          stream: false,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`LLM tool call failed: ${res.status} ${await res.text()}`);
+      }
+      const json = await res.json();
+      return parseToolCalls(json?.choices?.[0]?.message ?? {});
+    },
   };
 }
 
@@ -115,13 +192,6 @@ export function getDeepSeekClient(): LLMClient {
 
 export function getFastClient(): LLMClient {
   return buildClient(process.env.DEEPSEEK_FAST_MODEL || "deepseek-chat");
-}
-
-// The planner decides chat-vs-data and recovers follow-up intent — the step where
-// "understand what the user means" matters most. Default it to the stronger reasoner;
-// override with DEEPSEEK_PLANNER_MODEL (e.g. "deepseek-chat") to A/B without a redeploy.
-export function getPlannerClient(): LLMClient {
-  return buildClient(process.env.DEEPSEEK_PLANNER_MODEL || "deepseek-reasoner");
 }
 
 export function extractJson(text: string): unknown {
@@ -149,148 +219,6 @@ export function extractJson(text: string): unknown {
     }
     throw new Error("No JSON found in LLM response");
   }
-}
-
-export async function selectTables(
-  llm: LLMClient,
-  question: string,
-  tables: TableSummary[],
-  history?: ConversationTurn[]
-): Promise<string[]> {
-  const known = new Set(tables.map((t) => t.table));
-  const list = tables
-    .map((t) => `- ${t.table}${t.description ? `: ${t.description}` : ""}`)
-    .join("\n");
-  const priorQuestions = (history ?? [])
-    .map((h) => h.question)
-    .filter(Boolean)
-    .join("; ");
-
-  const messages: LLMMessage[] = [
-    {
-      role: "system",
-      content:
-        "You select which database tables are needed to answer a question. " +
-        "If the question is a follow-up (e.g. 'try again', 'fix it', 'now by month'), " +
-        "use the recent questions to infer the intended data question. " +
-        "Reply with ONLY a JSON array of table names (a subset of the provided list).",
-    },
-    {
-      role: "user",
-      content:
-        `Question: ${question}\n` +
-        (priorQuestions ? `Recent questions in this conversation: ${priorQuestions}\n` : "") +
-        `\nTables:\n${list}`,
-    },
-  ];
-
-  try {
-    const raw = await llm.complete(messages);
-    const parsed = extractJson(raw);
-    if (Array.isArray(parsed)) {
-      const picked = parsed
-        .filter((x): x is string => typeof x === "string")
-        .filter((t) => known.has(t));
-      if (picked.length > 0) return picked;
-    }
-  } catch {
-    /* fall through */
-  }
-  return tables.map((t) => t.table); // safe fallback: everything
-}
-
-export interface PlanResult {
-  kind: "chat" | "data";
-  reply?: string;
-}
-
-export async function planMessage(
-  planner: LLMClient,
-  question: string,
-  history: ConversationTurn[],
-  tables: TableSummary[]
-): Promise<PlanResult> {
-  const tableList = tables.map((t) => `- ${t.table}`).join("\n");
-  const recent = history
-    .map(
-      (h) =>
-        `Q: ${h.question}` +
-        (h.answer ? `\nA: ${h.answer}` : h.ok ? "" : " (the attempt failed)")
-    )
-    .join("\n");
-  const messages: LLMMessage[] = [
-    {
-      role: "system",
-      content:
-        "You are the planner for a ULink analytics assistant. Decide whether the user's " +
-        "message needs a database query. Reply with ONLY JSON: " +
-        '{"kind":"data"} if it asks about ULink data/metrics, or ' +
-        '{"kind":"chat","reply":"..."} for greetings, thanks, clarifications, or general ' +
-        "questions, where reply is a brief, friendly answer. If the user refers to a previous " +
-        "question (e.g. 'try again', 'now by month'), treat it as data. " +
-        "A pasted URL, short link, slug, email, or ID is a DATA lookup (search the data for it) — " +
-        "NEVER reply that you can't browse the web. " +
-        "If the user is answering a clarifying question you asked, or refining a metric definition, " +
-        "continue that thread as data once the definition is clear. " +
-        "If the message refers to an entity ambiguously ('he', 'it', 'this', 'his project') with no " +
-        "clear referent in the recent conversation, return kind:chat whose reply briefly asks which " +
-        "one they mean — do NOT guess or invent an entity.",
-    },
-    {
-      role: "user",
-      content:
-        `Message: ${question}\n` +
-        (recent ? `Recent questions:\n${recent}\n` : "") +
-        `\nAvailable tables:\n${tableList}`,
-    },
-  ];
-  try {
-    const raw = await planner.complete(messages);
-    const parsed = extractJson(raw) as { kind?: string; reply?: string };
-    if (parsed?.kind === "chat") {
-      return {
-        kind: "chat",
-        reply:
-          typeof parsed.reply === "string" && parsed.reply.trim()
-            ? parsed.reply
-            : "How can I help with your ULink data?",
-      };
-    }
-    return { kind: "data" };
-  } catch {
-    return { kind: "data" };
-  }
-}
-
-export async function narrate(
-  fast: LLMClient,
-  input: { question: string; sql: string; result: QueryResult },
-  onContent: (delta: string) => void
-): Promise<string> {
-  const preview = {
-    columns: input.result.columns,
-    rowCount: input.result.rowCount,
-    rows: input.result.rows.slice(0, 50),
-  };
-  const messages: LLMMessage[] = [
-    {
-      role: "system",
-      content:
-        "You are a data analyst assistant for ULink. Given a question and its query results, " +
-        "write a concise, friendly answer (1-4 sentences) stating the key numbers/findings. " +
-        "Only use values present in the results; never invent data. Do not show SQL. " +
-        "If rowCount is 0, say no matching data was found. " +
-        "If the result is a single row whose values are all NULL/empty, or whose key identifying " +
-        "column(s) are NULL/empty, treat it as NO MATCH — say nothing was found; do NOT describe a " +
-        "NULL/empty result as if it were a real entity or finding.",
-    },
-    {
-      role: "user",
-      content:
-        `Question: ${input.question}\n\nResults (JSON, up to 50 rows):\n${JSON.stringify(preview)}`,
-    },
-  ];
-  return fast.stream(messages, { onContent });
 }
 
 export interface GenerateSqlInput {

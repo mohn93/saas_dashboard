@@ -1,16 +1,15 @@
-import { generateSql, narrate, planMessage, selectTables, type LLMClient } from "./llm";
-import { validateSelect } from "./validate";
+import { TOOL_DEFS, dispatchTool, type ToolContext } from "./agent-tools";
+import type { LLMClient, LLMToolMessage } from "./llm";
 import type { AgentEvent } from "./events";
-import type { ChartSpec, ConversationTurn, MemoryStore, QueryResult } from "./types";
+import type { ConversationTurn, MemoryStore, QueryResult, TableSummary } from "./types";
 
 export interface AgentDeps {
-  reasoner: LLMClient;
-  fast: LLMClient;
-  planner?: LLMClient; // model for chat-vs-data planning; falls back to `fast`
+  orchestrator: LLMClient; // V3, tool-calling
+  reasoner: LLMClient; // R1, used by the query tool
   memory: MemoryStore;
   execute: (sql: string) => Promise<QueryResult>;
   maxRows?: number;
-  maxAttempts?: number;
+  maxSteps?: number;
 }
 
 export interface AgentInput {
@@ -19,125 +18,103 @@ export interface AgentInput {
   history?: ConversationTurn[];
 }
 
+function buildSystemPrompt(tables: TableSummary[]): string {
+  const tableList = tables
+    .map((t) => `- ${t.table}${t.description ? `: ${t.description}` : ""}`)
+    .join("\n");
+  return [
+    "You are the PM Data Agent for ULink. You answer questions about ULink's data by calling tools.",
+    "Use the `query` tool to get data — it writes and runs read-only SQL for you; just ask a clear, " +
+      "self-contained question in plain English. Use `clarify` to ask the user when the request is " +
+      "ambiguous. When you have enough to answer, reply in prose with the finding and make NO tool call.",
+    "Rules:",
+    "- A pasted URL, short link, slug, email, or ID is a DATA lookup — use `query` to find it; never say you can't browse the web.",
+    "- If a reference is ambiguous ('he', 'it', 'this', 'his project') with no clear antecedent in the conversation, call `clarify` — do not guess or invent an entity.",
+    "- Verify an entity exists (via `query`) before reasoning about it. If a lookup returns no rows, say nothing was found — never describe an empty/NULL result as a real finding.",
+    "- Be concise. Only state numbers/values present in query results; never invent data.",
+    "",
+    "Tables you can query (ask `query` in plain English; it knows the columns):",
+    tableList,
+  ].join("\n");
+}
+
+function historyToMessages(history: ConversationTurn[]): LLMToolMessage[] {
+  const msgs: LLMToolMessage[] = [];
+  for (const h of history) {
+    msgs.push({ role: "user", content: h.question });
+    msgs.push({
+      role: "assistant",
+      content: h.answer ? h.answer : h.ok ? "(answered with data)" : "(the previous attempt failed)",
+    });
+  }
+  return msgs;
+}
+
 export async function runAgent(
   input: AgentInput,
   deps: AgentDeps,
   emit: (event: AgentEvent) => void
 ): Promise<void> {
+  const maxSteps = deps.maxSteps ?? 6;
   const maxRows = deps.maxRows ?? 1000;
-  const maxAttempts = deps.maxAttempts ?? 3;
-  const history = input.history ?? [];
 
   try {
-    emit({ type: "phase", phase: "planning" });
     const summaries = await deps.memory.getTableSummaries();
-    const plan = await planMessage(deps.planner ?? deps.fast, input.question, history, summaries);
-
-    // --- chat path: no query, just a conversational reply ---
-    if (plan.kind === "chat") {
-      const reply = plan.reply ?? "How can I help with your ULink data?";
-      emit({ type: "narration", delta: reply });
-      const logId = await deps.memory.insertQueryLog({
-        question: input.question,
-        sql: null,
-        attempts: 0,
-        rowCount: null,
-        success: true,
-        error: null,
-        userEmail: input.userEmail,
-      });
-      emit({ type: "phase", phase: "done" });
-      emit({ type: "done", logId });
-      return;
-    }
-
-    // --- data path ---
-    emit({ type: "phase", phase: "selecting" });
-    const tables = await selectTables(deps.fast, input.question, summaries, history);
-    emit({ type: "step", label: "Selected tables", detail: tables.join(", ") });
-
-    const [columns, foreignKeys, examples] = await Promise.all([
-      deps.memory.getColumnsForTables(tables),
-      deps.memory.getForeignKeysForTables(tables),
-      deps.memory.getTrustedExamples(),
-    ]);
-
-    emit({ type: "phase", phase: "writing" });
-    let priorError: string | null = null;
-    let lastSql: string | null = null;
-    let attempts = 0;
-    let chart: ChartSpec | null = null;
-    let result: QueryResult | null = null;
-
-    while (attempts < maxAttempts) {
-      attempts++;
-      try {
-        const gen = await generateSql(
-          deps.reasoner,
-          { question: input.question, columns, foreignKeys, examples, history, priorError },
-          (delta) => emit({ type: "reasoning", delta })
-        );
-        chart = gen.chart;
-        lastSql = gen.sql;
-
-        const v = validateSelect(gen.sql, maxRows);
-        if (!v.ok) {
-          priorError = v.error ?? "Invalid SQL";
-          emit({ type: "step", label: "Fixing query", detail: priorError });
-          continue;
-        }
-
-        emit({ type: "phase", phase: "running" });
-        result = await deps.execute(v.sql);
-        break;
-      } catch (err) {
-        priorError = err instanceof Error ? err.message : String(err);
-        emit({ type: "step", label: "Retrying", detail: priorError });
-      }
-    }
-
-    if (!result) {
-      await deps.memory.insertQueryLog({
-        question: input.question,
-        sql: lastSql,
-        attempts,
-        rowCount: null,
-        success: false,
-        error: priorError,
-        userEmail: input.userEmail,
-      });
-      emit({ type: "phase", phase: "error" });
-      emit({ type: "error", error: priorError ?? "Failed to answer the question" });
-      return;
-    }
-
-    emit({ type: "sql", sql: lastSql! });
-    emit({
-      type: "result",
-      columns: result.columns,
-      rows: result.rows,
-      rowCount: result.rowCount,
-      chart,
-    });
-
-    emit({ type: "phase", phase: "narrating" });
-    await narrate(
-      deps.fast,
-      { question: input.question, sql: lastSql!, result },
-      (delta) => emit({ type: "narration", delta })
-    );
-
-    const logId = await deps.memory.insertQueryLog({
-      question: input.question,
-      sql: lastSql,
-      attempts,
-      rowCount: result.rowCount,
-      success: true,
-      error: null,
+    const messages: LLMToolMessage[] = [
+      { role: "system", content: buildSystemPrompt(summaries) },
+      ...historyToMessages(input.history ?? []),
+      { role: "user", content: input.question },
+    ];
+    const ctx: ToolContext = {
+      reasoner: deps.reasoner,
+      memory: deps.memory,
+      execute: deps.execute,
+      emit,
       userEmail: input.userEmail,
+      maxRows,
+    };
+    let primaryLogId: string | null = null;
+
+    for (let step = 0; step < maxSteps; step++) {
+      emit({ type: "phase", phase: "working" });
+      const turn = await deps.orchestrator.chatWithTools(messages, TOOL_DEFS);
+
+      if (turn.toolCalls.length > 0) {
+        messages.push({
+          role: "assistant",
+          content: turn.content ?? "",
+          tool_calls: turn.toolCalls.map((tc) => ({
+            id: tc.id,
+            type: "function",
+            function: { name: tc.name, arguments: tc.arguments },
+          })),
+        });
+        for (const call of turn.toolCalls) {
+          const outcome = await dispatchTool(call, ctx);
+          if (outcome.logId) primaryLogId = outcome.logId;
+          messages.push({ role: "tool", tool_call_id: call.id, content: outcome.content });
+          if (outcome.clarify) {
+            emit({ type: "narration", delta: outcome.clarify });
+            emit({ type: "phase", phase: "done" });
+            emit({ type: "done", logId: null });
+            return;
+          }
+        }
+        continue;
+      }
+
+      const answer = (turn.content ?? "").trim();
+      emit({ type: "narration", delta: answer || "I couldn't find an answer to that." });
+      emit({ type: "phase", phase: "done" });
+      emit({ type: "done", logId: primaryLogId });
+      return;
+    }
+
+    emit({ type: "phase", phase: "error" });
+    emit({
+      type: "error",
+      error: "I couldn't complete that within the step limit. Try narrowing the question.",
     });
-    emit({ type: "phase", phase: "done" });
-    emit({ type: "done", logId });
   } catch (err) {
     emit({ type: "phase", phase: "error" });
     emit({ type: "error", error: err instanceof Error ? err.message : "Agent failed" });

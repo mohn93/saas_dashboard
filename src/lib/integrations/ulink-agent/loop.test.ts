@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { runAgent } from "./loop";
-import type { LLMClient } from "./llm";
+import type { LLMClient, ToolChatResult } from "./llm";
 import type { AgentEvent } from "./events";
 import type { MemoryStore, QueryResult } from "./types";
 
 function fakeMemory(overrides: Partial<MemoryStore> = {}): MemoryStore {
   return {
-    getTableSummaries: async () => [{ table: "links", description: null }],
+    getTableSummaries: async () => [{ table: "links", description: "deep links" }],
     getColumnsForTables: async () => [
       { table: "links", column: "id", dataType: "uuid", isNullable: false, description: null },
     ],
@@ -19,101 +19,119 @@ function fakeMemory(overrides: Partial<MemoryStore> = {}): MemoryStore {
   };
 }
 
-function streamReturning(text: string): LLMClient["stream"] {
-  return async (_messages, handlers) => {
-    handlers.onContent?.(text);
-    return text;
+function reasonerReturning(sql: string): LLMClient {
+  const out = `{"sql":${JSON.stringify(sql)},"chart":{"type":"none","xColumn":null,"yColumn":null}}`;
+  return {
+    model: "r1",
+    complete: vi.fn(),
+    chatWithTools: vi.fn(),
+    stream: async (_m, h) => {
+      h.onContent?.(out);
+      return out;
+    },
   };
 }
 
-const okResult: QueryResult = { columns: ["n"], rows: [{ n: 5 }], rowCount: 1 };
+function orchestratorReturning(...results: ToolChatResult[]): LLMClient {
+  const fn = vi.fn();
+  for (const r of results) fn.mockResolvedValueOnce(r);
+  fn.mockResolvedValue({ content: "Done.", toolCalls: [] });
+  return { model: "v3", complete: vi.fn(), stream: vi.fn(), chatWithTools: fn };
+}
 
-describe("runAgent", () => {
-  it("chat path: narrates a reply, no result, done", async () => {
-    const fast: LLMClient = {
-      model: "fast",
-      complete: vi.fn().mockResolvedValue('{"kind":"chat","reply":"Hi there!"}'),
-      stream: streamReturning(""),
-    };
-    const reasoner: LLMClient = { model: "r", complete: vi.fn(), stream: vi.fn() };
+const okResult: QueryResult = { columns: ["n"], rows: [{ n: 5 }], rowCount: 1 };
+const queryCall = (q: string): ToolChatResult => ({
+  content: null,
+  toolCalls: [{ id: "c1", name: "query", arguments: JSON.stringify({ question: q }) }],
+});
+
+describe("runAgent (tool-calling loop)", () => {
+  it("runs a query tool then answers with narration + done(logId)", async () => {
+    const orchestrator = orchestratorReturning(queryCall("how many links?"), {
+      content: "You have 5 links.",
+      toolCalls: [],
+    });
+    const reasoner = reasonerReturning("SELECT count(*) AS n FROM links");
+    const execute = vi.fn().mockResolvedValue(okResult);
+    const events: AgentEvent[] = [];
+    await runAgent(
+      { question: "how many links?", userEmail: "pm@x.com" },
+      { orchestrator, reasoner, memory: fakeMemory(), execute },
+      (e) => events.push(e)
+    );
+    const types = events.map((e) => e.type);
+    expect(types).toEqual(expect.arrayContaining(["sql", "result", "narration", "done"]));
+    const narration = events.find((e) => e.type === "narration");
+    expect(narration && "delta" in narration && narration.delta).toContain("5 links");
+    const done = events.find((e) => e.type === "done");
+    expect(done && "logId" in done && done.logId).toBe("log-1");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("chat path: answers directly with no tool calls", async () => {
+    const orchestrator = orchestratorReturning({ content: "Hi! Ask me about ULink data.", toolCalls: [] });
     const events: AgentEvent[] = [];
     await runAgent(
       { question: "hello", userEmail: null },
-      { fast, reasoner, memory: fakeMemory(), execute: vi.fn() },
+      { orchestrator, reasoner: reasonerReturning(""), memory: fakeMemory(), execute: vi.fn() },
       (e) => events.push(e)
     );
     const types = events.map((e) => e.type);
     expect(types).toContain("narration");
     expect(types).toContain("done");
     expect(types).not.toContain("result");
-    const narration = events.find((e) => e.type === "narration");
-    expect(narration && "delta" in narration && narration.delta).toContain("Hi there!");
   });
 
-  it("data path: selects, writes SQL, runs, emits result, narrates, done", async () => {
-    const fast: LLMClient = {
-      model: "fast",
-      complete: vi
-        .fn()
-        .mockResolvedValueOnce('{"kind":"data"}') // planner
-        .mockResolvedValueOnce('["links"]'), // selectTables
-      stream: streamReturning("You have 5 links."), // narrate
+  it("clarify: emits the question + done and stops looping", async () => {
+    const clarifyCall: ToolChatResult = {
+      content: null,
+      toolCalls: [{ id: "c1", name: "clarify", arguments: JSON.stringify({ question: "Which project?" }) }],
     };
-    const reasoner: LLMClient = {
-      model: "r",
-      complete: vi.fn(),
-      stream: async (_m, h) => {
-        h.onReasoning?.("thinking about links");
-        const out = '{"sql":"SELECT count(*) AS n FROM links","chart":{"type":"none","xColumn":null,"yColumn":null}}';
-        h.onContent?.(out);
-        return out;
-      },
-    };
-    const execute = vi.fn().mockResolvedValue(okResult);
+    const orchestrator = orchestratorReturning(clarifyCall);
     const events: AgentEvent[] = [];
     await runAgent(
-      { question: "how many links", userEmail: "pm@x.com" },
-      { fast, reasoner, memory: fakeMemory(), execute },
+      { question: "is he churned?", userEmail: null },
+      { orchestrator, reasoner: reasonerReturning(""), memory: fakeMemory(), execute: vi.fn() },
       (e) => events.push(e)
     );
-    const types = events.map((e) => e.type);
-    expect(types).toEqual(
-      expect.arrayContaining(["phase", "step", "reasoning", "sql", "result", "narration", "done"])
-    );
-    const result = events.find((e) => e.type === "result");
-    expect(result && "rowCount" in result && result.rowCount).toBe(1);
-    const done = events.find((e) => e.type === "done");
-    expect(done && "logId" in done && done.logId).toBe("log-1");
-    expect(execute).toHaveBeenCalledTimes(1);
+    const narration = events.find((e) => e.type === "narration");
+    expect(narration && "delta" in narration && narration.delta).toBe("Which project?");
+    expect(events.some((e) => e.type === "done")).toBe(true);
+    expect((orchestrator.chatWithTools as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
   });
 
-  it("data path: emits error after exhausting attempts", async () => {
-    const fast: LLMClient = {
-      model: "fast",
-      complete: vi
-        .fn()
-        .mockResolvedValueOnce('{"kind":"data"}')
-        .mockResolvedValueOnce('["links"]'),
-      stream: streamReturning(""),
-    };
-    const reasoner: LLMClient = {
-      model: "r",
+  it("emits an error when the step cap is exceeded", async () => {
+    const orchestrator: LLMClient = {
+      model: "v3",
       complete: vi.fn(),
-      stream: async (_m, h) => {
-        const out = '{"sql":"SELECT bad FROM links","chart":{"type":"none","xColumn":null,"yColumn":null}}';
-        h.onContent?.(out);
-        return out;
-      },
+      stream: vi.fn(),
+      chatWithTools: vi.fn().mockResolvedValue(queryCall("loop forever")),
     };
-    const execute = vi.fn().mockRejectedValue(new Error("boom"));
-    const insertQueryLog = vi.fn().mockResolvedValue("log-err");
     const events: AgentEvent[] = [];
     await runAgent(
-      { question: "q", userEmail: null },
-      { fast, reasoner, memory: fakeMemory({ insertQueryLog }), execute, maxAttempts: 2 },
+      { question: "loop", userEmail: null },
+      { orchestrator, reasoner: reasonerReturning("SELECT 1 AS n FROM links"), memory: fakeMemory(), execute: vi.fn().mockResolvedValue(okResult), maxSteps: 2 },
       (e) => events.push(e)
     );
     expect(events.some((e) => e.type === "error")).toBe(true);
-    expect(insertQueryLog).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+    expect((orchestrator.chatWithTools as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(2);
+  });
+
+  it("recovers from a bad tool call and still answers", async () => {
+    const badArgs: ToolChatResult = {
+      content: null,
+      toolCalls: [{ id: "c1", name: "query", arguments: "not json" }],
+    };
+    const orchestrator = orchestratorReturning(badArgs, { content: "All set.", toolCalls: [] });
+    const events: AgentEvent[] = [];
+    await runAgent(
+      { question: "q", userEmail: null },
+      { orchestrator, reasoner: reasonerReturning(""), memory: fakeMemory(), execute: vi.fn() },
+      (e) => events.push(e)
+    );
+    expect(events.some((e) => e.type === "error")).toBe(false);
+    expect(events.some((e) => e.type === "result")).toBe(false);
+    const narration = events.find((e) => e.type === "narration");
+    expect(narration && "delta" in narration && narration.delta).toBe("All set.");
   });
 });

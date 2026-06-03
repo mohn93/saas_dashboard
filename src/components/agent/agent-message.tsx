@@ -10,11 +10,8 @@ import type { AgentAnswer } from "@/lib/integrations/ulink-agent/types";
 
 const PHASE_LABEL: Record<string, string> = {
   idle: "Starting…",
-  planning: "Thinking…",
-  selecting: "Choosing tables…",
-  writing: "Writing SQL…",
+  working: "Thinking…",
   running: "Running query…",
-  narrating: "Composing answer…",
   done: "Done",
   error: "Error",
 };
