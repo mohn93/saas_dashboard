@@ -21,6 +21,24 @@ const COLLAPSED_ROWS = 4;
 // the persist cap (one source) instead of a separate literal that can drift.
 const MAX_ROWS = MAX_CACHED_ROWS;
 
+// Explicit, dark-theme-friendly palette so charts never fall back to Tremor's
+// default colors (which render an unreadable near-black slice on our dark bg).
+// Violet first to lead with the app accent; all entries stay vivid on dark.
+const CHART_COLORS = [
+  "violet",
+  "blue",
+  "cyan",
+  "emerald",
+  "amber",
+  "rose",
+  "indigo",
+  "fuchsia",
+  "teal",
+  "sky",
+  "orange",
+  "lime",
+];
+
 // ISO date or datetime, e.g. "2026-05-06" or "2026-05-06T04:44:25.000Z".
 const ISO_DATE_RE =
   /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$/;
@@ -126,13 +144,22 @@ function Chart({ answer }: { answer: AgentAnswer }) {
 
   let el: JSX.Element;
   if (chart.type === "pie") {
-    el = <DonutChart data={data} category={yCol} index={xCol} variant="pie" className="h-64 mt-4" />;
+    el = (
+      <DonutChart
+        data={data}
+        category={yCol}
+        index={xCol}
+        variant="pie"
+        colors={CHART_COLORS}
+        className="h-64 mt-4"
+      />
+    );
   } else if (chart.type === "line") {
-    el = <LineChart data={data} index={xCol} categories={categories} className="h-64 mt-4" />;
+    el = <LineChart data={data} index={xCol} categories={categories} colors={CHART_COLORS} className="h-64 mt-4" />;
   } else if (chart.type === "area") {
-    el = <AreaChart data={data} index={xCol} categories={categories} className="h-64 mt-4" />;
+    el = <AreaChart data={data} index={xCol} categories={categories} colors={CHART_COLORS} className="h-64 mt-4" />;
   } else {
-    el = <BarChart data={data} index={xCol} categories={categories} className="h-64 mt-4" />;
+    el = <BarChart data={data} index={xCol} categories={categories} colors={CHART_COLORS} className="h-64 mt-4" />;
   }
 
   // Charts render as SVG with no inherent text alternative; give the whole
