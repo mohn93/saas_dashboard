@@ -1,6 +1,7 @@
 "use client";
 
 import { ResultView } from "@/components/agent/result-view";
+import { Markdown } from "@/components/agent/markdown";
 import type { AgentAnswer } from "@/lib/integrations/ulink-agent/types";
 import type { Widget } from "@/lib/integrations/ulink-agent/types";
 
@@ -14,11 +15,7 @@ function formatKpi(value: unknown): string {
 
 export function WidgetBody({ widget }: { widget: Widget }) {
   if (widget.kind === "text") {
-    return (
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-        {widget.textMd || ""}
-      </p>
-    );
+    return <Markdown className="text-muted-foreground">{widget.textMd || ""}</Markdown>;
   }
 
   if (!widget.result) {
