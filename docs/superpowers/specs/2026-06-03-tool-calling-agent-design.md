@@ -33,7 +33,7 @@ clarification and validating assumptions before concluding.
   function-calling; a frontier model was considered but parked.)
 - **SQL authoring — hybrid:** V3 orchestrates in natural language; the **`query` tool
   delegates SQL writing to R1** (`generateSql`), preserving R1's SQL quality.
-- **Tools:** `query`, `clarify`, optional `get_schema`. "Finish" is implicit (V3 emits
+- **Tools:** `query` and `clarify` only (no `get_schema`). "Finish" is implicit (V3 emits
   text with no tool calls → that's the answer). No separate `narrate` call.
 - **Rollout:** **Replace** the pipeline (one code path; `planMessage`/`selectTables`/
   `narrate` deleted). No parallel/flagged engine.
@@ -93,8 +93,10 @@ result fed back to V3).
 
 - **`query(question: string)`** — the workhorse (hybrid SQL).
   1. `gen = await generateSql(deps.reasoner /* R1 */, { question, columns, foreignKeys, examples })`
-     — columns/FKs come from the catalog for tables R1 needs; examples from
-     `getTrustedExamples()`.
+     — R1 receives the **full column catalog** (all tables' columns + FKs) plus trusted
+     examples (`getTrustedExamples()`). There is **no table-selection step** (the old
+     `selectTables` is gone); R1 handles the long schema context. If prompt size ever
+     becomes a problem, table-scoping can be reintroduced later (YAGNI for now).
   2. `v = validateSelect(gen.sql, MAX_ROWS)`; on `!v.ok` → return `{ error }` to V3.
   3. `result = await executeReadOnly(v.sql)`; on throw → return `{ error: message }`.
   4. Emit `sql` and `result` (with `gen.chart`) events. Log to `query_log` (success),
@@ -104,11 +106,6 @@ result fed back to V3).
 
 - **`clarify(question: string)`** — terminal. Emits `narration` (the question) + `done`;
   returns control. No data, no logId.
-
-- **`get_schema(tables: string[])`** *(optional drill-down)* — returns columns + FKs for
-  the named tables as a string. V3 already has table **summaries** in its system prompt;
-  this is only for when it needs column-level detail to phrase a `query`. Included but
-  minimal.
 
 Malformed/invalid tool arguments → the dispatcher returns a tool error string ("invalid
 arguments for <tool>") so V3 retries; the loop never throws on tool input.
@@ -140,8 +137,8 @@ dashboard pinning, and 👍 feedback are **unchanged**:
 Built once per turn from the catalog and fixed guardrails:
 
 - **Role:** "You answer questions about ULink's data by calling tools. Use `query` to get
-  data (it writes and runs read-only SQL for you), `clarify` to ask the user when the
-  request is ambiguous, and `get_schema` for column detail. When you have enough, reply
+  data (it writes and runs read-only SQL for you — just ask in plain English) and
+  `clarify` to ask the user when the request is ambiguous. When you have enough, reply
   with the answer in prose."
 - **Domain:** the catalog **table summaries** (`getTableSummaries()`), so V3 knows what's
   queryable — including the two-level user model (ULink customers vs. their apps'
@@ -239,14 +236,16 @@ and the `finally { controller.close() }` are unchanged.
   underperforms).
 - Parallel/flagged engine (we replace outright).
 - Multi-result display in the UI (last result wins; the narration covers the rest).
-- New tools beyond `query`/`clarify`/`get_schema` (e.g. dedicated `lookup_link`) — `query`
-  covers lookups.
+- Any tool beyond `query`/`clarify` — `get_schema` was considered and cut (R1 gets the full
+  catalog inside `query`); a dedicated `lookup_link`/`lookup_user` is unnecessary because
+  `query` covers lookups.
 - Memory/schema changes; dashboard or persistence changes (event protocol is stable).
 
 ## Files
 
 - **Rewrite:** `src/lib/integrations/ulink-agent/loop.ts` (the tool-calling loop).
-- **New:** `src/lib/integrations/ulink-agent/agent-tools.ts` (tool defs + executors).
+- **New:** `src/lib/integrations/ulink-agent/agent-tools.ts` (tool defs + executors for
+  `query` and `clarify`).
 - **Modify:** `src/lib/integrations/ulink-agent/llm.ts` — add `chatWithTools` (+ tool types)
   to the client; **keep** `generateSql`/`extractJson`/`parseSseLine`; **remove**
   `planMessage`, `selectTables`, `narrate`, `getPlannerClient`, `PlanResult`.
