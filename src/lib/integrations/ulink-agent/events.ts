@@ -1,13 +1,6 @@
 import type { ChartSpec } from "./types";
 
-export type AgentPhase =
-  | "planning"
-  | "selecting"
-  | "writing"
-  | "running"
-  | "narrating"
-  | "done"
-  | "error";
+export type AgentPhase = "working" | "running" | "done" | "error";
 
 export type AgentEvent =
   | { type: "phase"; phase: AgentPhase }

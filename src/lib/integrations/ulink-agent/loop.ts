@@ -29,7 +29,7 @@ export async function runAgent(
   const history = input.history ?? [];
 
   try {
-    emit({ type: "phase", phase: "planning" });
+    emit({ type: "phase", phase: "working" });
     const summaries = await deps.memory.getTableSummaries();
     const plan = await planMessage(deps.planner ?? deps.fast, input.question, history, summaries);
 
@@ -52,7 +52,7 @@ export async function runAgent(
     }
 
     // --- data path ---
-    emit({ type: "phase", phase: "selecting" });
+    emit({ type: "phase", phase: "working" });
     const tables = await selectTables(deps.fast, input.question, summaries, history);
     emit({ type: "step", label: "Selected tables", detail: tables.join(", ") });
 
@@ -62,7 +62,7 @@ export async function runAgent(
       deps.memory.getTrustedExamples(),
     ]);
 
-    emit({ type: "phase", phase: "writing" });
+    emit({ type: "phase", phase: "working" });
     let priorError: string | null = null;
     let lastSql: string | null = null;
     let attempts = 0;
@@ -120,7 +120,7 @@ export async function runAgent(
       chart,
     });
 
-    emit({ type: "phase", phase: "narrating" });
+    emit({ type: "phase", phase: "working" });
     await narrate(
       deps.fast,
       { question: input.question, sql: lastSql!, result },

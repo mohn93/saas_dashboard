@@ -29,8 +29,8 @@ describe("applyEvent (message reducer)", () => {
 
   it("updates phase and loading flag on phase event", () => {
     let m = emptyMessage("m1", "q");
-    m = applyEvent(m, { type: "phase", phase: "selecting" });
-    expect(m.phase).toBe("selecting");
+    m = applyEvent(m, { type: "phase", phase: "working" });
+    expect(m.phase).toBe("working");
     expect(m.loading).toBe(true);
     m = applyEvent(m, { type: "phase", phase: "done" });
     expect(m.phase).toBe("done");

@@ -4,7 +4,7 @@ import { applyEvent, emptyMessage } from "./use-agent-stream";
 describe("applyEvent", () => {
   it("accumulates reasoning, steps, narration and finalizes on done", () => {
     let m = emptyMessage("m1", "how many links");
-    m = applyEvent(m, { type: "phase", phase: "selecting" });
+    m = applyEvent(m, { type: "phase", phase: "working" });
     m = applyEvent(m, { type: "step", label: "Selected tables", detail: "links" });
     m = applyEvent(m, { type: "reasoning", delta: "think " });
     m = applyEvent(m, { type: "reasoning", delta: "more" });
