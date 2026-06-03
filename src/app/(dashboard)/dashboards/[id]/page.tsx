@@ -6,6 +6,7 @@ import { RefreshCw, Pencil, Check, ArrowLeft } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { DashboardGrid } from "@/components/dashboard-builder/dashboard-grid";
 import { AddWidgetComposer } from "@/components/dashboard-builder/add-widget-composer";
+import { EditQueryModal } from "@/components/dashboard-builder/edit-query-modal";
 import type { ChartSpec, QueryResult } from "@/lib/integrations/ulink-agent/types";
 
 export default function DashboardDetailPage({ params }: { params: { id: string } }) {
@@ -25,6 +26,10 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
   } = useDashboard(params.id);
   const [editing, setEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState<string | null>(null);
+  // Edit-query modal: the widget being re-asked + its in-flight state.
+  const [editTarget, setEditTarget] = useState<{ id: string; question: string } | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   if (notFound) {
     return (
@@ -40,16 +45,26 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
   function onEditQuery(id: string) {
     const w = widgets.find((x) => x.id === id);
     if (!w) return;
-    const next = window.prompt("Re-ask the agent for this widget:", w.question ?? "");
-    if (next === null || !next.trim()) return;
-    // Re-run via the compose endpoint, then patch the widget with the new query + result.
-    void (async () => {
+    setEditError(null);
+    setEditTarget({ id, question: w.question ?? "" });
+  }
+
+  async function runEditQuery(question: string) {
+    if (!editTarget || !question.trim()) return;
+    const { id } = editTarget;
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      // Re-run via the compose endpoint, then patch the widget with the new query + result.
       const res = await fetch("/api/agent/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: next.trim(), history: [], persist: false }),
+        body: JSON.stringify({ question: question.trim(), history: [], persist: false }),
       });
-      if (!res.body) return;
+      if (!res.body) {
+        setEditError("Couldn't reach the agent. Try again.");
+        return;
+      }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -81,11 +96,14 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
       consume(buffer);
       // A failed or chat-path re-ask yields no query/result — never blank a working widget.
       if (sql === null || result === null) {
-        window.alert("The agent didn't return a query for that question — the widget was left unchanged.");
+        setEditError("The agent didn't return a query for that question — the widget was left unchanged.");
         return;
       }
-      await updateWidget(id, { question: next.trim(), sql, chart, result });
-    })();
+      await updateWidget(id, { question: question.trim(), sql, chart, result });
+      setEditTarget(null);
+    } finally {
+      setEditBusy(false);
+    }
   }
 
   return (
@@ -143,6 +161,21 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
         >
           <AddWidgetComposer onAdd={addWidget} />
         </DashboardGrid>
+      )}
+
+      {editTarget && (
+        <EditQueryModal
+          key={editTarget.id}
+          initialQuestion={editTarget.question}
+          busy={editBusy}
+          error={editError}
+          onCancel={() => {
+            if (editBusy) return;
+            setEditTarget(null);
+            setEditError(null);
+          }}
+          onSubmit={(q) => void runEditQuery(q)}
+        />
       )}
     </div>
   );
