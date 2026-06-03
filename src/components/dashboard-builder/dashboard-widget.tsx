@@ -7,20 +7,30 @@ import { WidgetBody } from "./widget-body";
 import { cn } from "@/lib/utils";
 import type { WidgetPatch } from "@/lib/integrations/ulink-agent/widgets";
 import {
+  hasUsableChart,
+  inferChartSpec,
+  initialChartType,
+} from "@/lib/integrations/ulink-agent/widgets";
+import {
   SELECTABLE_CHART_TYPES,
   SELECTABLE_WIDGET_KINDS,
   WIDGET_SIZES,
 } from "@/lib/integrations/ulink-agent/types";
-import type { DisplayMode, Widget, WidgetKind, WidgetSize } from "@/lib/integrations/ulink-agent/types";
+import type { Widget, WidgetKind, WidgetSize } from "@/lib/integrations/ulink-agent/types";
 
 const SIZE_LABEL: Record<WidgetSize, string> = { sm: "S", md: "M", full: "Full" };
 
-// Keep `display` coherent when the render kind changes: table/kpi always render
-// as a table; switching to chart shows the chart only (preserving "both" if the
-// widget was already a chart with the table turned on).
-function kindDisplay(kind: WidgetKind, current: DisplayMode): { display: DisplayMode } {
-  if (kind !== "chart") return { display: "table" };
-  return { display: current === "both" ? "both" : "chart" };
+// Build the patch for a render-kind change so the widget stays coherent:
+//  - table/kpi always render as a table;
+//  - chart shows the chart only (preserving "both" if the table was on), and
+//    infers axes from the result when the widget has no usable chart yet (e.g.
+//    a table widget switched to chart) so it doesn't render an empty chart.
+function kindPatch(kind: WidgetKind, widget: Widget): WidgetPatch {
+  if (kind !== "chart") return { kind, display: "table" };
+  const display = widget.display === "both" ? "both" : "chart";
+  if (hasUsableChart(widget.chart)) return { kind, display };
+  const inferred = inferChartSpec(widget.result, initialChartType(widget.chart));
+  return { kind, display, chart: inferred ?? widget.chart };
 }
 
 export function DashboardWidget({
@@ -147,7 +157,7 @@ export function DashboardWidget({
                   type="button"
                   role="radio"
                   aria-checked={widget.kind === k}
-                  onClick={() => onPatch({ kind: k, ...kindDisplay(k, widget.display) })}
+                  onClick={() => onPatch(kindPatch(k, widget))}
                   className={cn("px-2 py-1 capitalize", widget.kind === k ? "bg-violet-600 text-white" : "hover:bg-accent")}
                 >
                   {k}
