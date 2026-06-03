@@ -68,30 +68,31 @@ export default function AgentPage() {
         onDelete={handleDelete}
       />
 
-      <div className="mx-auto flex h-full max-w-3xl flex-1 flex-col">
-        <div>
+      {/* full-width column so the scroll area spans the gutters; content is
+          centered by inner max-w-3xl wrappers. This lets the thread scroll when
+          the cursor is anywhere in the column, not only over the narrow center. */}
+      <div className="flex h-full min-w-0 flex-1 flex-col">
+        <div className="mx-auto w-full max-w-3xl">
           <h1 className="text-2xl font-bold tracking-tight">PM Data Agent</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Ask about ULink in plain English — it explains the answer and shows the data. Read-only.
           </p>
         </div>
 
-        <div
-          ref={scrollRef}
-          onScroll={onScroll}
-          className="mt-6 flex-1 space-y-6 overflow-y-auto pb-4"
-        >
-          {messages.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              e.g. &ldquo;How many signups per week over the last 8 weeks?&rdquo;
-            </p>
-          )}
-          {messages.map((m) => (
-            <AgentMessage key={m.id} message={m} onFeedback={sendFeedback} />
-          ))}
+        <div ref={scrollRef} onScroll={onScroll} className="mt-6 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-3xl space-y-6 pb-4">
+            {messages.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                e.g. &ldquo;How many signups per week over the last 8 weeks?&rdquo;
+              </p>
+            )}
+            {messages.map((m) => (
+              <AgentMessage key={m.id} message={m} onFeedback={sendFeedback} />
+            ))}
+          </div>
         </div>
 
-        <form onSubmit={submit} className="mt-auto flex items-end gap-2 border-t border-border/50 pt-4">
+        <form onSubmit={submit} className="mx-auto mt-auto flex w-full max-w-3xl items-end gap-2 border-t border-border/50 pt-4">
           <textarea
             ref={inputRef}
             value={input}
