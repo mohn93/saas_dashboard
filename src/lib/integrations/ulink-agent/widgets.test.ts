@@ -13,7 +13,10 @@ import {
   inferChartSpec,
   pickInitialKind,
   resolveWidgetChart,
+  parseWidgetCreate,
+  parseWidgetPatch,
 } from "./widgets";
+import { ValidationError } from "./errors";
 import type { QueryResult } from "./types";
 
 const oneByOne: QueryResult = { columns: ["mau"], rows: [{ mau: 51884 }], rowCount: 1 };
@@ -173,8 +176,12 @@ describe("canPickChart / initialChartType", () => {
   it("canPickChart true when result is chartable", () => {
     expect(canPickChart(series, null)).toBe(true);
   });
-  it("canPickChart true when the answer already has chart axes", () => {
-    expect(canPickChart(allText, { type: "none", xColumn: "a", yColumn: "b" })).toBe(true);
+  it("canPickChart true when the answer already has a usable chart (real type + axes)", () => {
+    expect(canPickChart(allText, { type: "bar", xColumn: "a", yColumn: "b" })).toBe(true);
+  });
+  it("canPickChart false for a chart with axes but type 'none' (renderer would refuse it)", () => {
+    // The picker enabling a chart the renderer can't draw was the divergence fix.
+    expect(canPickChart(allText, { type: "none", xColumn: "a", yColumn: "b" })).toBe(false);
   });
   it("canPickChart false when neither chartable nor axes present", () => {
     expect(canPickChart(allText, null)).toBe(false);
@@ -201,5 +208,60 @@ describe("resolveWidgetChart", () => {
   it("returns the base chart unchanged for non-chart kinds", () => {
     const base = { type: "bar" as const, xColumn: "m", yColumn: "n" };
     expect(resolveWidgetChart(series, base, "table", "pie")).toBe(base);
+  });
+});
+
+describe("parseWidgetCreate", () => {
+  const ok = { kind: "chart", title: "Signups", size: "md", display: "chart" };
+
+  it("accepts a valid body and defaults display to 'both'", () => {
+    const out = parseWidgetCreate({ kind: "table", title: "t", size: "sm" });
+    expect(out.display).toBe("both");
+    expect(out.kind).toBe("table");
+  });
+  it("keeps an explicit display", () => {
+    expect(parseWidgetCreate(ok).display).toBe("chart");
+  });
+  it("rejects an unknown kind", () => {
+    expect(() => parseWidgetCreate({ ...ok, kind: "bogus" })).toThrow(ValidationError);
+  });
+  it("rejects an unknown size", () => {
+    expect(() => parseWidgetCreate({ ...ok, size: "huge" })).toThrow(ValidationError);
+  });
+  it("rejects an unknown display", () => {
+    expect(() => parseWidgetCreate({ ...ok, display: "nope" })).toThrow(ValidationError);
+  });
+  it("rejects a missing/blank title", () => {
+    expect(() => parseWidgetCreate({ kind: "table", size: "md" })).toThrow(ValidationError);
+    expect(() => parseWidgetCreate({ kind: "table", size: "md", title: "  " })).toThrow(ValidationError);
+  });
+  it("rejects a chart with an invalid type", () => {
+    expect(() =>
+      parseWidgetCreate({ ...ok, chart: { type: "donut", xColumn: "a", yColumn: "b" } })
+    ).toThrow(ValidationError);
+  });
+  it("rejects a malformed result", () => {
+    expect(() => parseWidgetCreate({ ...ok, result: { columns: "nope", rows: [], rowCount: 0 } })).toThrow(
+      ValidationError
+    );
+  });
+});
+
+describe("parseWidgetPatch", () => {
+  it("only includes provided keys", () => {
+    expect(parseWidgetPatch({ title: "x" })).toEqual({ title: "x" });
+    expect(parseWidgetPatch({})).toEqual({});
+  });
+  it("validates enum fields when present", () => {
+    expect(() => parseWidgetPatch({ kind: "bogus" })).toThrow(ValidationError);
+    expect(() => parseWidgetPatch({ size: "huge" })).toThrow(ValidationError);
+    expect(() => parseWidgetPatch({ display: "nope" })).toThrow(ValidationError);
+  });
+  it("rejects a non-integer position", () => {
+    expect(() => parseWidgetPatch({ position: 1.5 })).toThrow(ValidationError);
+  });
+  it("accepts a valid full patch", () => {
+    const patch = parseWidgetPatch({ kind: "chart", size: "full", display: "both", position: 3 });
+    expect(patch).toEqual({ kind: "chart", size: "full", display: "both", position: 3 });
   });
 });
