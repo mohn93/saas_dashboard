@@ -112,6 +112,18 @@ export function canChart(result: QueryResult | null): boolean {
   return chartColumns(result) !== null;
 }
 
+// Whether the add-to-dashboard picker should ENABLE the Chart option: either the result is
+// inferrably chartable, or the answer already carries chart axes. Kept in lock-step with the
+// chart branch of pickInitialKind so the picker's enabled state and its default never diverge.
+export function canPickChart(result: QueryResult | null, chart: ChartSpec | null): boolean {
+  return canChart(result) || !!(chart && chart.xColumn && chart.yColumn);
+}
+
+// Default chart type for the picker: the answer's own chart type if set, else "bar".
+export function initialChartType(chart: ChartSpec | null): ChartType {
+  return chart && chart.type !== "none" ? chart.type : "bar";
+}
+
 export function inferChartSpec(
   result: QueryResult | null,
   type: ChartType = "bar"

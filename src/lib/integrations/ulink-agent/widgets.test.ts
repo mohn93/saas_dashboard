@@ -8,6 +8,8 @@ import {
   capRows,
   widgetFromAnswer,
   canChart,
+  canPickChart,
+  initialChartType,
   inferChartSpec,
   pickInitialKind,
   resolveWidgetChart,
@@ -161,6 +163,29 @@ describe("pickInitialKind", () => {
   });
   it("returns table when display is table even if chartable", () => {
     expect(pickInitialKind(series, usableChart, "table")).toBe("table");
+  });
+});
+
+describe("canPickChart / initialChartType", () => {
+  const series: QueryResult = { columns: ["m", "n"], rows: [{ m: "a", n: 1 }], rowCount: 1 };
+  const allText: QueryResult = { columns: ["a", "b"], rows: [{ a: "x", b: "y" }], rowCount: 1 };
+
+  it("canPickChart true when result is chartable", () => {
+    expect(canPickChart(series, null)).toBe(true);
+  });
+  it("canPickChart true when the answer already has chart axes", () => {
+    expect(canPickChart(allText, { type: "none", xColumn: "a", yColumn: "b" })).toBe(true);
+  });
+  it("canPickChart false when neither chartable nor axes present", () => {
+    expect(canPickChart(allText, null)).toBe(false);
+    expect(canPickChart(null, null)).toBe(false);
+  });
+  it("initialChartType returns the answer's chart type when set", () => {
+    expect(initialChartType({ type: "pie", xColumn: "m", yColumn: "n" })).toBe("pie");
+  });
+  it("initialChartType defaults to bar for none/null", () => {
+    expect(initialChartType({ type: "none", xColumn: null, yColumn: null })).toBe("bar");
+    expect(initialChartType(null)).toBe("bar");
   });
 });
 
