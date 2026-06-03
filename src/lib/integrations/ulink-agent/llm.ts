@@ -13,6 +13,37 @@ export interface LLMMessage {
   content: string;
 }
 
+export interface LLMToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+
+// Message shape for the tool-calling protocol (adds the `tool` role + tool_calls).
+export interface LLMToolMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_call_id?: string;
+  tool_calls?: LLMToolCall[];
+}
+
+// OpenAI-style tool definition.
+export interface ToolDef {
+  type: "function";
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+}
+
+export interface ParsedToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+export interface ToolChatResult {
+  content: string | null;
+  toolCalls: ParsedToolCall[];
+}
+
 export interface StreamHandlers {
   onReasoning?: (delta: string) => void;
   onContent?: (delta: string) => void;
@@ -22,6 +53,29 @@ export interface LLMClient {
   model: string;
   complete(messages: LLMMessage[]): Promise<string>;
   stream(messages: LLMMessage[], handlers: StreamHandlers): Promise<string>;
+  chatWithTools(messages: LLMToolMessage[], tools: ToolDef[]): Promise<ToolChatResult>;
+}
+
+// Pure: normalize a /chat/completions assistant message into content + tool calls.
+export function parseToolCalls(message: {
+  content?: unknown;
+  tool_calls?: unknown;
+}): ToolChatResult {
+  const raw = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
+  const toolCalls: ParsedToolCall[] = raw
+    .map((tc: Record<string, unknown>) => {
+      const fn = (tc?.function ?? {}) as Record<string, unknown>;
+      return {
+        id: typeof tc?.id === "string" ? tc.id : "",
+        name: typeof fn?.name === "string" ? fn.name : "",
+        arguments: typeof fn?.arguments === "string" ? fn.arguments : "{}",
+      };
+    })
+    .filter((tc: ParsedToolCall) => tc.id !== "" && tc.name !== "");
+  return {
+    content: typeof message?.content === "string" ? message.content : null,
+    toolCalls,
+  };
 }
 
 // Parse one SSE line ("data: {json}") into content/reasoning deltas.
@@ -105,6 +159,31 @@ function buildClient(model: string): LLMClient {
       }
       handle(buffer);
       return full;
+    },
+    async chatWithTools(
+      messages: LLMToolMessage[],
+      tools: ToolDef[]
+    ): Promise<ToolChatResult> {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          tools,
+          tool_choice: "auto",
+          temperature: 0,
+          stream: false,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`LLM tool call failed: ${res.status} ${await res.text()}`);
+      }
+      const json = await res.json();
+      return parseToolCalls(json?.choices?.[0]?.message ?? {});
     },
   };
 }

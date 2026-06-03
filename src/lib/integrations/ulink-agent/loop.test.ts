@@ -34,8 +34,9 @@ describe("runAgent", () => {
       model: "fast",
       complete: vi.fn().mockResolvedValue('{"kind":"chat","reply":"Hi there!"}'),
       stream: streamReturning(""),
+      chatWithTools: async () => ({ content: null, toolCalls: [] }),
     };
-    const reasoner: LLMClient = { model: "r", complete: vi.fn(), stream: vi.fn() };
+    const reasoner: LLMClient = { model: "r", complete: vi.fn(), stream: vi.fn(), chatWithTools: async () => ({ content: null, toolCalls: [] }) };
     const events: AgentEvent[] = [];
     await runAgent(
       { question: "hello", userEmail: null },
@@ -58,6 +59,7 @@ describe("runAgent", () => {
         .mockResolvedValueOnce('{"kind":"data"}') // planner
         .mockResolvedValueOnce('["links"]'), // selectTables
       stream: streamReturning("You have 5 links."), // narrate
+      chatWithTools: async () => ({ content: null, toolCalls: [] }),
     };
     const reasoner: LLMClient = {
       model: "r",
@@ -68,6 +70,7 @@ describe("runAgent", () => {
         h.onContent?.(out);
         return out;
       },
+      chatWithTools: async () => ({ content: null, toolCalls: [] }),
     };
     const execute = vi.fn().mockResolvedValue(okResult);
     const events: AgentEvent[] = [];
@@ -95,6 +98,7 @@ describe("runAgent", () => {
         .mockResolvedValueOnce('{"kind":"data"}')
         .mockResolvedValueOnce('["links"]'),
       stream: streamReturning(""),
+      chatWithTools: async () => ({ content: null, toolCalls: [] }),
     };
     const reasoner: LLMClient = {
       model: "r",
@@ -104,6 +108,7 @@ describe("runAgent", () => {
         h.onContent?.(out);
         return out;
       },
+      chatWithTools: async () => ({ content: null, toolCalls: [] }),
     };
     const execute = vi.fn().mockRejectedValue(new Error("boom"));
     const insertQueryLog = vi.fn().mockResolvedValue("log-err");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractJson, selectTables, generateSql, parseSseLine, planMessage } from "./llm";
+import { extractJson, selectTables, generateSql, parseSseLine, planMessage, parseToolCalls } from "./llm";
 import type { LLMClient } from "./llm";
 
 function stubLLM(response: string): LLMClient {
@@ -10,6 +10,7 @@ function stubLLM(response: string): LLMClient {
       handlers.onContent?.(response);
       return response;
     },
+    chatWithTools: async () => ({ content: null, toolCalls: [] }),
   };
 }
 
@@ -110,6 +111,7 @@ describe("generateSql streaming", () => {
         h.onContent?.(out);
         return out;
       },
+      chatWithTools: async () => ({ content: null, toolCalls: [] }),
     };
     const gen = await generateSql(
       llm,
@@ -118,5 +120,36 @@ describe("generateSql streaming", () => {
     );
     expect(gen.sql).toContain("SELECT 1");
     expect(reasoningSeen).toContain("let me think");
+  });
+});
+
+describe("parseToolCalls", () => {
+  it("extracts tool calls from an assistant message", () => {
+    const out = parseToolCalls({
+      content: null,
+      tool_calls: [
+        { id: "c1", type: "function", function: { name: "query", arguments: '{"question":"how many links?"}' } },
+      ],
+    });
+    expect(out.content).toBeNull();
+    expect(out.toolCalls).toHaveLength(1);
+    expect(out.toolCalls[0]).toEqual({ id: "c1", name: "query", arguments: '{"question":"how many links?"}' });
+  });
+
+  it("returns content and no tool calls for a plain answer", () => {
+    const out = parseToolCalls({ content: "You have 5 links." });
+    expect(out.content).toBe("You have 5 links.");
+    expect(out.toolCalls).toEqual([]);
+  });
+
+  it("drops malformed tool calls (missing id or name) and defaults arguments", () => {
+    const out = parseToolCalls({
+      content: null,
+      tool_calls: [
+        { id: "", function: { name: "query", arguments: "{}" } }, // no id → dropped
+        { id: "c2", function: { name: "clarify" } }, // no arguments → "{}"
+      ],
+    });
+    expect(out.toolCalls).toEqual([{ id: "c2", name: "clarify", arguments: "{}" }]);
   });
 });
