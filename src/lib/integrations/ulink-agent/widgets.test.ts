@@ -7,6 +7,10 @@ import {
   applyReorder,
   capRows,
   widgetFromAnswer,
+  canChart,
+  inferChartSpec,
+  pickInitialKind,
+  resolveWidgetChart,
 } from "./widgets";
 import type { QueryResult } from "./types";
 
@@ -105,5 +109,72 @@ describe("widgetFromAnswer", () => {
     expect(w.title).toBe("Signups");
     expect(w.size).toBe("full");
     expect(w.kind).toBe("table");
+  });
+});
+
+describe("canChart / inferChartSpec", () => {
+  const chartable: QueryResult = {
+    columns: ["month", "n"],
+    rows: [{ month: "2026-04", n: 4 }, { month: "2026-05", n: 2 }],
+    rowCount: 2,
+  };
+  const allText: QueryResult = {
+    columns: ["a", "b"],
+    rows: [{ a: "x", b: "y" }],
+    rowCount: 1,
+  };
+
+  it("canChart true for a label + numeric column", () => {
+    expect(canChart(chartable)).toBe(true);
+  });
+  it("canChart false for all-text or null/empty", () => {
+    expect(canChart(allText)).toBe(false);
+    expect(canChart(null)).toBe(false);
+    expect(canChart({ columns: ["n"], rows: [], rowCount: 0 })).toBe(false);
+  });
+  it("inferChartSpec picks label x + numeric y, default bar", () => {
+    expect(inferChartSpec(chartable)).toEqual({ type: "bar", xColumn: "month", yColumn: "n" });
+  });
+  it("inferChartSpec honors a passed type", () => {
+    expect(inferChartSpec(chartable, "pie")).toEqual({ type: "pie", xColumn: "month", yColumn: "n" });
+  });
+  it("inferChartSpec returns null when not chartable", () => {
+    expect(inferChartSpec(allText)).toBeNull();
+  });
+});
+
+describe("pickInitialKind", () => {
+  const oneByOne: QueryResult = { columns: ["mau"], rows: [{ mau: 5 }], rowCount: 1 };
+  const series: QueryResult = {
+    columns: ["m", "n"],
+    rows: [{ m: "a", n: 1 }],
+    rowCount: 1,
+  };
+  const usableChart = { type: "pie" as const, xColumn: "m", yColumn: "n" };
+
+  it("returns kpi for a 1x1 numeric result", () => {
+    expect(pickInitialKind(oneByOne, null, "both")).toBe("kpi");
+  });
+  it("returns chart when display is chart/both and chartable", () => {
+    expect(pickInitialKind(series, null, "chart")).toBe("chart");
+    expect(pickInitialKind(series, usableChart, "both")).toBe("chart");
+  });
+  it("returns table when display is table even if chartable", () => {
+    expect(pickInitialKind(series, usableChart, "table")).toBe("table");
+  });
+});
+
+describe("resolveWidgetChart", () => {
+  const series: QueryResult = { columns: ["m", "n"], rows: [{ m: "a", n: 1 }], rowCount: 1 };
+  it("forces the chosen type onto an existing usable chart", () => {
+    const base = { type: "bar" as const, xColumn: "m", yColumn: "n" };
+    expect(resolveWidgetChart(series, base, "chart", "pie")).toEqual({ type: "pie", xColumn: "m", yColumn: "n" });
+  });
+  it("infers a chart when there is no usable base chart", () => {
+    expect(resolveWidgetChart(series, null, "chart", "line")).toEqual({ type: "line", xColumn: "m", yColumn: "n" });
+  });
+  it("returns the base chart unchanged for non-chart kinds", () => {
+    const base = { type: "bar" as const, xColumn: "m", yColumn: "n" };
+    expect(resolveWidgetChart(series, base, "table", "pie")).toBe(base);
   });
 });

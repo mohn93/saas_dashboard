@@ -1,5 +1,5 @@
 import { deriveTitle } from "./conversations";
-import type { ChartSpec, QueryResult, WidgetKind, WidgetSize } from "./types";
+import type { ChartSpec, ChartType, DisplayMode, QueryResult, WidgetKind, WidgetSize } from "./types";
 
 export const STALE_MS = 5 * 60_000; // auto-refresh widgets whose cache is older than 5 min
 export const MAX_CACHED_ROWS = 100; // cap rows stored in cached_result (chart/table need few)
@@ -93,4 +93,67 @@ export function widgetFromAnswer(input: {
     result: capRows(input.result),
     textMd: null,
   };
+}
+
+// Find a (label, value) column pair for charting: a numeric column + a different column.
+function chartColumns(result: QueryResult | null): { label: string; value: string } | null {
+  if (!result || result.rows.length === 0 || result.columns.length < 2) return null;
+  const first = result.rows[0];
+  const value = result.columns.find((c) => isNumericCell(first[c]));
+  if (!value) return null;
+  const label =
+    result.columns.find((c) => c !== value && !isNumericCell(first[c])) ??
+    result.columns.find((c) => c !== value);
+  if (!label) return null;
+  return { label, value };
+}
+
+export function canChart(result: QueryResult | null): boolean {
+  return chartColumns(result) !== null;
+}
+
+export function inferChartSpec(
+  result: QueryResult | null,
+  type: ChartType = "bar"
+): ChartSpec | null {
+  const cols = chartColumns(result);
+  if (!cols) return null;
+  return { type, xColumn: cols.label, yColumn: cols.value };
+}
+
+function hasUsableChart(chart: ChartSpec | null): boolean {
+  return !!(chart && chart.type !== "none" && chart.xColumn && chart.yColumn);
+}
+
+// Default widget kind for the add-to-dashboard picker, from the answer + the agent's display.
+export function pickInitialKind(
+  result: QueryResult | null,
+  chart: ChartSpec | null,
+  display: DisplayMode
+): WidgetKind {
+  if (
+    result &&
+    result.rows.length === 1 &&
+    result.columns.length === 1 &&
+    isNumericCell(result.rows[0][result.columns[0]])
+  ) {
+    return "kpi";
+  }
+  if ((display === "chart" || display === "both") && (hasUsableChart(chart) || canChart(result))) {
+    return "chart";
+  }
+  return "table";
+}
+
+// The chart spec to store for a chosen widget kind: for "chart", force the chosen type onto
+// the model's axes (or infer them); for table/kpi, leave the base chart as-is (render ignores it).
+export function resolveWidgetChart(
+  result: QueryResult | null,
+  baseChart: ChartSpec | null,
+  kind: WidgetKind,
+  chartType: ChartType
+): ChartSpec | null {
+  if (kind !== "chart") return baseChart;
+  if (hasUsableChart(baseChart)) return { ...(baseChart as ChartSpec), type: chartType };
+  return inferChartSpec(result, chartType);
 }
