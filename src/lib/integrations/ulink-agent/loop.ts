@@ -39,6 +39,10 @@ function buildSystemPrompt(tables: TableSummary[]): string {
     "- If a reference is ambiguous ('he', 'it', 'this', 'his project') with no clear antecedent in the conversation, call `clarify` — do not guess or invent an entity.",
     "- Verify an entity exists (via `query`) before reasoning about it. If a lookup returns no rows, say nothing was found — never describe an empty/NULL result as a real finding.",
     "- Be concise. Only state numbers/values present in query results; never invent data.",
+    "- The result TABLE (and chart, if any) is rendered to the user automatically BELOW your reply. Do " +
+      "NOT reproduce the data as a Markdown table or a long list in your reply — summarize the key " +
+      "takeaway in prose and refer to what's shown (e.g. \"the breakdown is in the table below\"). " +
+      "Quoting one or two key figures inline is fine; never restate the full result.",
     "",
     "Tables you can query (ask `query` in plain English; it knows the columns):",
     tableList,
