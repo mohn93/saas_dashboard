@@ -206,8 +206,10 @@ export function widgetFromAnswer(input: {
   display?: DisplayMode;
 }): WidgetCreateInput {
   const kind = input.kind ?? deriveWidgetKind(input.result, input.chart);
-  // Only chart widgets carry a chart/both display; table & kpi always render as a table.
-  const display: DisplayMode = kind === "chart" ? input.display ?? "both" : "table";
+  // Chart widgets default to chart-only ("a graph without a table"); the table
+  // can be turned back on per-widget in the dashboard editor. table & kpi
+  // widgets always render as a table.
+  const display: DisplayMode = kind === "chart" ? input.display ?? "chart" : "table";
   return {
     kind,
     title: input.title?.trim() || deriveTitle(input.question),

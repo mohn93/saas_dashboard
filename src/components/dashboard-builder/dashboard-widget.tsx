@@ -10,9 +10,17 @@ import {
   SELECTABLE_WIDGET_KINDS,
   WIDGET_SIZES,
 } from "@/lib/integrations/ulink-agent/types";
-import type { Widget, WidgetSize } from "@/lib/integrations/ulink-agent/types";
+import type { DisplayMode, Widget, WidgetKind, WidgetSize } from "@/lib/integrations/ulink-agent/types";
 
 const SIZE_LABEL: Record<WidgetSize, string> = { sm: "S", md: "M", full: "Full" };
+
+// Keep `display` coherent when the render kind changes: table/kpi always render
+// as a table; switching to chart shows the chart only (preserving "both" if the
+// widget was already a chart with the table turned on).
+function kindDisplay(kind: WidgetKind, current: DisplayMode): { display: DisplayMode } {
+  if (kind !== "chart") return { display: "table" };
+  return { display: current === "both" ? "both" : "chart" };
+}
 
 export function DashboardWidget({
   widget,
@@ -104,7 +112,7 @@ export function DashboardWidget({
                   type="button"
                   role="radio"
                   aria-checked={widget.kind === k}
-                  onClick={() => onPatch({ kind: k })}
+                  onClick={() => onPatch({ kind: k, ...kindDisplay(k, widget.display) })}
                   className={cn("px-2 py-1 capitalize", widget.kind === k ? "bg-violet-600 text-white" : "hover:bg-accent")}
                 >
                   {k}
@@ -131,6 +139,23 @@ export function DashboardWidget({
                 </button>
               ))}
             </div>
+          )}
+
+          {/* table visibility (chart kind only) — "a graph without a table" */}
+          {widget.kind === "chart" && (
+            <button
+              type="button"
+              aria-pressed={widget.display === "both"}
+              onClick={() => onPatch({ display: widget.display === "both" ? "chart" : "both" })}
+              className={cn(
+                "rounded-md border px-2 py-1",
+                widget.display === "both"
+                  ? "border-violet-500/50 bg-violet-600 text-white"
+                  : "border-border/50 hover:bg-accent"
+              )}
+            >
+              {widget.display === "both" ? "Table on" : "Table off"}
+            </button>
           )}
 
           {isQuery && (

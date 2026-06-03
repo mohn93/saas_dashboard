@@ -60,7 +60,7 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
       title,
       size,
       kind,
-      display: message.display,
+      // chart widgets default to chart-only (table toggled on per-widget later)
       chart: resolveWidgetChart(message.result, message.chart, kind, chartType),
     });
     try {
@@ -102,7 +102,7 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
         title: title || message.question,
         position: 0,
         size,
-        display: kind === "chart" ? message.display : "table",
+        display: kind === "chart" ? "chart" : "table",
         question: message.question,
         sql: message.sql,
         chart: resolveWidgetChart(message.result, message.chart, kind, chartType),

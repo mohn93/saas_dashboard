@@ -115,6 +115,38 @@ describe("widgetFromAnswer", () => {
     expect(w.size).toBe("full");
     expect(w.kind).toBe("table");
   });
+  it("defaults a chart widget to chart-only (graph without a table)", () => {
+    const w = widgetFromAnswer({
+      question: "signups by day",
+      sql: "select ...",
+      chart: { type: "bar", xColumn: "day", yColumn: "n" },
+      result: multi,
+      kind: "chart",
+    });
+    expect(w.display).toBe("chart");
+  });
+  it("honors an explicit display on a chart widget", () => {
+    const w = widgetFromAnswer({
+      question: "signups by day",
+      sql: "select ...",
+      chart: { type: "bar", xColumn: "day", yColumn: "n" },
+      result: multi,
+      kind: "chart",
+      display: "both",
+    });
+    expect(w.display).toBe("both");
+  });
+  it("forces table/kpi widgets to a table display regardless of input", () => {
+    const w = widgetFromAnswer({
+      question: "signups by day",
+      sql: "select ...",
+      chart: { type: "bar", xColumn: "day", yColumn: "n" },
+      result: multi,
+      kind: "table",
+      display: "both",
+    });
+    expect(w.display).toBe("table");
+  });
 });
 
 describe("canChart / inferChartSpec", () => {
