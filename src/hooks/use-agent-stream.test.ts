@@ -15,6 +15,7 @@ describe("applyEvent", () => {
       rows: [{ n: 5 }],
       rowCount: 1,
       chart: { type: "none", xColumn: null, yColumn: null },
+      display: "both",
     });
     m = applyEvent(m, { type: "narration", delta: "You have " });
     m = applyEvent(m, { type: "narration", delta: "5 links." });

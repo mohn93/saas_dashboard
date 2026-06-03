@@ -14,6 +14,7 @@ describe("applyEvent (message reducer)", () => {
       rows: [{ n: 5 }],
       rowCount: 1,
       chart: { type: "none", xColumn: null, yColumn: null },
+      display: "both",
     });
     m = applyEvent(m, { type: "narration", delta: "You have 5 links." });
     m = applyEvent(m, { type: "done", logId: "log-1" });
@@ -43,6 +44,23 @@ describe("applyEvent (message reducer)", () => {
     expect(m.error).toBe("boom");
     expect(m.loading).toBe(false);
     expect(m.phase).toBe("error");
+  });
+
+  it("sets display from a result event", () => {
+    const m = applyEvent(emptyMessage("m1", "q"), {
+      type: "result",
+      columns: ["n"],
+      rows: [{ n: 5 }],
+      rowCount: 1,
+      chart: null,
+      display: "chart",
+    });
+    expect(m.display).toBe("chart");
+    expect(m.result?.rowCount).toBe(1);
+  });
+
+  it("defaults display to 'both' on a fresh message", () => {
+    expect(emptyMessage("m1", "q").display).toBe("both");
   });
 });
 
