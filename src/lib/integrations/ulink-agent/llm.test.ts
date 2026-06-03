@@ -60,6 +60,34 @@ describe("generateSql", () => {
     expect(out.sql).toContain("SELECT count(*)");
     expect(out.chart.type).toBe("bar");
   });
+
+  it("accepts a pie chart type", async () => {
+    const llm = stubLLM(
+      '{"sql":"SELECT plan AS p, count(*) AS n FROM subscriptions GROUP BY plan","chart":{"type":"pie","xColumn":"p","yColumn":"n"}}'
+    );
+    const out = await generateSql(llm, {
+      question: "cancellations by plan as a pie chart",
+      columns: [],
+      foreignKeys: [],
+      examples: [],
+    });
+    expect(out.chart.type).toBe("pie");
+    expect(out.chart.xColumn).toBe("p");
+    expect(out.chart.yColumn).toBe("n");
+  });
+
+  it("coerces an unknown chart type to none", async () => {
+    const llm = stubLLM(
+      '{"sql":"SELECT 1 AS n","chart":{"type":"scatter","xColumn":"a","yColumn":"n"}}'
+    );
+    const out = await generateSql(llm, {
+      question: "scatter please",
+      columns: [],
+      foreignKeys: [],
+      examples: [],
+    });
+    expect(out.chart.type).toBe("none");
+  });
 });
 
 

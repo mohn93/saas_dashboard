@@ -27,6 +27,13 @@ function buildSystemPrompt(tables: TableSummary[]): string {
     "Use the `query` tool to get data — it writes and runs read-only SQL for you; just ask a clear, " +
       "self-contained question in plain English. Use `clarify` to ask the user when the request is " +
       "ambiguous. When you have enough to answer, reply in prose with the finding and make NO tool call.",
+    "Charts & tables: every `query` result is shown to the user automatically as a TABLE, and as a " +
+      "CHART when the data suits it (the tool picks bar / line / area / pie). So you CAN display charts " +
+      "and tables — NEVER tell the user you can't, and never send them to a spreadsheet. When they want " +
+      "a chart (e.g. a pie chart), run a `query` whose result is chart-friendly: one label column plus " +
+      "one numeric column — usually an aggregate like a count or sum grouped by a category or time " +
+      "bucket (e.g. cancellations per month) — and you may name the chart type in the question " +
+      "(e.g. 'as a pie chart'). Then tell the user the chart and table are shown below.",
     "Rules:",
     "- A pasted URL, short link, slug, email, or ID is a DATA lookup — use `query` to find it; never say you can't browse the web.",
     "- If a reference is ambiguous ('he', 'it', 'this', 'his project') with no clear antecedent in the conversation, call `clarify` — do not guess or invent an entity.",

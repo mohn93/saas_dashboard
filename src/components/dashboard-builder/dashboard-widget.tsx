@@ -10,7 +10,7 @@ import type { Widget, WidgetKind, WidgetSize } from "@/lib/integrations/ulink-ag
 const SIZES: WidgetSize[] = ["sm", "md", "full"];
 const SIZE_LABEL: Record<WidgetSize, string> = { sm: "S", md: "M", full: "Full" };
 const KINDS: WidgetKind[] = ["chart", "table", "kpi"];
-const CHART_TYPES = ["bar", "line", "area"] as const;
+const CHART_TYPES = ["bar", "line", "area", "pie"] as const;
 
 export function DashboardWidget({
   widget,
