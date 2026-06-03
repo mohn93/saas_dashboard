@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronRight, Loader2, ThumbsUp, ThumbsDown, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ResultView } from "@/components/agent/result-view";
+import { Markdown } from "@/components/agent/markdown";
 import { PinToDashboard } from "@/components/agent/pin-to-dashboard";
 import type { AgentMessage as AgentMessageType } from "@/hooks/use-agent-stream";
 import type { AgentAnswer } from "@/lib/integrations/ulink-agent/types";
@@ -98,7 +99,7 @@ export function AgentMessage({
       {message.narration && (
         <div className="flex gap-2 text-sm">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-400" />
-          <p className="whitespace-pre-wrap leading-relaxed">{message.narration}</p>
+          <Markdown className="min-w-0 flex-1">{message.narration}</Markdown>
         </div>
       )}
 
