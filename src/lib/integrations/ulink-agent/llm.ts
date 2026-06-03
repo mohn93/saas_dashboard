@@ -280,9 +280,13 @@ export async function generateSql(
         "When checking whether a specific entity exists or matches an identifier (slug/email/id), " +
         "filter in WHERE so the query returns ZERO rows when there is no match; do NOT use scalar " +
         "sub-selects that always return one (possibly all-NULL) row. " +
-        'Reply with ONLY JSON: {"sql": string, "chart": {"type": "bar"|"line"|"area"|"none", ' +
+        'Reply with ONLY JSON: {"sql": string, "chart": {"type": "bar"|"line"|"area"|"pie"|"none", ' +
         '"xColumn": string|null, "yColumn": string|null}}. ' +
-        "Choose a chart only if the result is naturally chartable; otherwise type \"none\".",
+        "Choose a chart only if the result is naturally chartable; otherwise type \"none\". " +
+        "For a chart, the query MUST return a label column (xColumn) and a numeric value column " +
+        "(yColumn) — usually an aggregate like count/sum grouped by a category or time bucket. " +
+        "Use \"pie\" for a share/breakdown across a few categories (xColumn = category label, " +
+        "yColumn = the numeric value); \"bar\" for category comparisons; \"line\"/\"area\" for time series.",
     },
     {
       role: "user",
@@ -305,7 +309,7 @@ export async function generateSql(
   }
   const chart: ChartSpec = parsed.chart
     ? {
-        type: (["bar", "line", "area", "none"].includes(parsed.chart.type as string)
+        type: (["bar", "line", "area", "pie", "none"].includes(parsed.chart.type as string)
           ? parsed.chart.type
           : "none") as ChartSpec["type"],
         xColumn: (parsed.chart.xColumn as string) ?? null,

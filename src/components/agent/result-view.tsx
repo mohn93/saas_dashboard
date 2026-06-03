@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { format, parseISO, isValid } from "date-fns";
 import * as Popover from "@radix-ui/react-popover";
 import { Maximize2 } from "lucide-react";
-import { BarChart, LineChart, AreaChart } from "@tremor/react";
+import { BarChart, LineChart, AreaChart, DonutChart } from "@tremor/react";
 import {
   Table,
   TableBody,
@@ -121,6 +121,16 @@ function Chart({ answer }: { answer: AgentAnswer }) {
   }));
   const categories: string[] = [yCol];
 
+  if (chart.type === "pie")
+    return (
+      <DonutChart
+        data={data}
+        category={yCol}
+        index={xCol}
+        variant="pie"
+        className="h-64 mt-4"
+      />
+    );
   if (chart.type === "line")
     return <LineChart data={data} index={xCol} categories={categories} className="h-64 mt-4" />;
   if (chart.type === "area")

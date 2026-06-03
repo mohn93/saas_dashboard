@@ -1,7 +1,7 @@
 export interface ChartSpec {
-  type: "bar" | "line" | "area" | "none";
-  xColumn: string | null;
-  yColumn: string | null;
+  type: "bar" | "line" | "area" | "pie" | "none";
+  xColumn: string | null; // label/category column
+  yColumn: string | null; // numeric value column
 }
 
 export interface CatalogColumn {
