@@ -125,6 +125,30 @@ describe("dispatchTool: query", () => {
     expect(JSON.parse(outcome.content).error).toBeTruthy();
   });
 
+  it("emits display='table' by default", async () => {
+    const events: AgentEvent[] = [];
+    const ctx = ctxWith({ reasoner: reasonerReturning("SELECT 1 AS n FROM links"), execute: vi.fn().mockResolvedValue(okResult), events });
+    await dispatchTool({ id: "c1", name: "query", arguments: JSON.stringify({ question: "q" }) }, ctx);
+    const result = events.find((e) => e.type === "result");
+    expect(result && "display" in result && result.display).toBe("table");
+  });
+
+  it("emits display='chart' when display arg is chart", async () => {
+    const events: AgentEvent[] = [];
+    const ctx = ctxWith({ reasoner: reasonerReturning("SELECT 1 AS n FROM links"), execute: vi.fn().mockResolvedValue(okResult), events });
+    await dispatchTool({ id: "c1", name: "query", arguments: JSON.stringify({ question: "q", display: "chart" }) }, ctx);
+    const result = events.find((e) => e.type === "result");
+    expect(result && "display" in result && result.display).toBe("chart");
+  });
+
+  it("treats a chart type with no display as display='chart'", async () => {
+    const events: AgentEvent[] = [];
+    const ctx = ctxWith({ reasoner: reasonerReturning("SELECT 1 AS n FROM links"), execute: vi.fn().mockResolvedValue(okResult), events });
+    await dispatchTool({ id: "c1", name: "query", arguments: JSON.stringify({ question: "q", chart: "pie" }) }, ctx);
+    const result = events.find((e) => e.type === "result");
+    expect(result && "display" in result && result.display).toBe("chart");
+  });
+
   it("returns an error when execution throws (logs failure)", async () => {
     const events: AgentEvent[] = [];
     const insertQueryLog = vi.fn().mockResolvedValue("log-err");
