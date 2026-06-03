@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { isStale } from "@/lib/integrations/ulink-agent/widgets";
+import { applyReorder, isStale } from "@/lib/integrations/ulink-agent/widgets";
 import type { WidgetCreateInput, WidgetPatch } from "@/lib/integrations/ulink-agent/widgets";
 import type {
   DashboardSummary,
@@ -97,11 +97,12 @@ export function useDashboard(id: string) {
           : {}),
       } as Widget)); // optimistic
       try {
-        await fetch(`/api/agent/widgets/${wid}`, {
+        const res = await fetch(`/api/agent/widgets/${wid}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
         });
+        if (!res.ok) void load(); // server rejected the edit — resync from source
       } catch {
         void load();
       }
@@ -113,7 +114,8 @@ export function useDashboard(id: string) {
     async (wid: string) => {
       setWidgets((prev) => prev.filter((w) => w.id !== wid)); // optimistic
       try {
-        await fetch(`/api/agent/widgets/${wid}`, { method: "DELETE" });
+        const res = await fetch(`/api/agent/widgets/${wid}`, { method: "DELETE" });
+        if (!res.ok) void load();
       } catch {
         void load();
       }
@@ -123,19 +125,17 @@ export function useDashboard(id: string) {
 
   const reorder = useCallback(
     async (orderedIds: string[]) => {
-      const positions = orderedIds.reduce<Record<string, number>>((acc, wid, i) => {
-        acc[wid] = i;
-        return acc;
-      }, {});
+      const positions = applyReorder(orderedIds);
       setWidgets((prev) =>
         [...prev].sort((a, b) => (positions[a.id] ?? 0) - (positions[b.id] ?? 0))
       ); // optimistic
       try {
-        await fetch(`/api/agent/dashboards/${id}/reorder`, {
+        const res = await fetch(`/api/agent/dashboards/${id}/reorder`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ positions }),
         });
+        if (!res.ok) void load();
       } catch {
         void load();
       }
@@ -147,11 +147,12 @@ export function useDashboard(id: string) {
     async (name: string) => {
       setDashboard((d) => (d ? { ...d, name } : d)); // optimistic
       try {
-        await fetch(`/api/agent/dashboards/${id}`, {
+        const res = await fetch(`/api/agent/dashboards/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name }),
         });
+        if (!res.ok) void load();
       } catch {
         void load();
       }

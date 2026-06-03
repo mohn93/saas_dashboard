@@ -40,7 +40,8 @@ export function useDashboards({ auto = true }: { auto?: boolean } = {}) {
     async (id: string) => {
       setDashboards((prev) => prev.filter((d) => d.id !== id)); // optimistic
       try {
-        await fetch(`/api/agent/dashboards/${id}`, { method: "DELETE" });
+        const res = await fetch(`/api/agent/dashboards/${id}`, { method: "DELETE" });
+        if (!res.ok) void refresh(); // server rejected — restore the true list
       } catch {
         void refresh();
       }

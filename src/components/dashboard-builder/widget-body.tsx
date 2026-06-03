@@ -2,14 +2,11 @@
 
 import { ResultView } from "@/components/agent/result-view";
 import { Markdown } from "@/components/agent/markdown";
-import type { AgentAnswer } from "@/lib/integrations/ulink-agent/types";
+import { buildAnswer, isNumericCell } from "@/lib/integrations/ulink-agent/widgets";
 import type { Widget } from "@/lib/integrations/ulink-agent/types";
 
 function formatKpi(value: unknown): string {
-  if (typeof value === "number") return value.toLocaleString();
-  if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) {
-    return Number(value).toLocaleString();
-  }
+  if (isNumericCell(value)) return Number(value).toLocaleString();
   return value === null || value === undefined ? "—" : String(value);
 }
 
@@ -32,15 +29,13 @@ export function WidgetBody({ widget }: { widget: Widget }) {
     );
   }
 
-  // chart / table → reuse ResultView. Force chart off for table kind.
-  const answer: AgentAnswer = {
-    ok: true,
+  // chart / table → reuse ResultView. Force chart off for table kind, and honor
+  // the stored display so a pinned chart renders the same way it did in chat
+  // (display is "table" for table/kpi widgets, so the table-only path is kept).
+  const answer = buildAnswer({
     sql: widget.sql,
     chart: widget.kind === "chart" ? widget.chart : { type: "none", xColumn: null, yColumn: null },
     result: widget.result,
-    error: null,
-    attempts: 0,
-    logId: null,
-  };
-  return <ResultView answer={answer} />;
+  });
+  return <ResultView answer={answer} display={widget.display} />;
 }

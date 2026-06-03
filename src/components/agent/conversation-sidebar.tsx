@@ -35,25 +35,26 @@ export function ConversationSidebar({
           <div
             key={c.id}
             className={cn(
-              "group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent",
+              "group flex items-center gap-1 rounded-md text-sm hover:bg-accent",
               c.id === activeId && "bg-accent"
             )}
-            onClick={() => onSelect(c.id)}
           >
-            <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => onSelect(c.id)}
+              aria-current={c.id === activeId ? "true" : undefined}
+              className="min-w-0 flex-1 rounded-md px-2 py-1.5 text-left"
+            >
               <div className="truncate">{c.title}</div>
               <div className="truncate text-[11px] text-muted-foreground">
                 {formatDistanceToNow(new Date(c.updatedAt), { addSuffix: true })}
                 {c.createdByEmail ? ` · ${c.createdByEmail}` : ""}
               </div>
-            </div>
+            </button>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(c.id);
-              }}
-              className="opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+              onClick={() => onDelete(c.id)}
+              className="mr-1 shrink-0 opacity-0 transition-opacity hover:text-red-400 focus-visible:opacity-100 group-hover:opacity-100"
               aria-label="Delete chat"
             >
               <Trash2 className="h-3.5 w-3.5" />

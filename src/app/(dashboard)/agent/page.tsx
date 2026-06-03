@@ -12,7 +12,7 @@ export default function AgentPage() {
   const onConversation = useCallback(() => {
     void list.refresh();
   }, [list.refresh]);
-  const { messages, conversationId, ask, sendFeedback, load, newChat } =
+  const { messages, conversationId, busy, ask, sendFeedback, load, newChat } =
     useAgentStream(onConversation);
   const [input, setInput] = useState("");
 
@@ -38,7 +38,7 @@ export default function AgentPage() {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const q = input.trim();
-    if (!q) return;
+    if (!q || busy) return; // one stream at a time — ignore submits while streaming
     setInput("");
     void ask(q);
   }
@@ -85,12 +85,14 @@ export default function AgentPage() {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            aria-label="Ask a question about ULink data"
             placeholder="Ask a question about ULink data…"
             className="flex-1 rounded-lg border border-border/50 bg-background px-3 py-2 text-sm outline-none focus:border-violet-500"
           />
           <button
             type="submit"
-            className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500"
+            disabled={busy || !input.trim()}
+            className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50"
           >
             <Send className="h-4 w-4" /> Ask
           </button>

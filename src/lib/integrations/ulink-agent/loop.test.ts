@@ -23,7 +23,6 @@ function reasonerReturning(sql: string): LLMClient {
   const out = `{"sql":${JSON.stringify(sql)},"chart":{"type":"none","xColumn":null,"yColumn":null}}`;
   return {
     model: "r1",
-    complete: vi.fn(),
     chatWithTools: vi.fn(),
     stream: async (_m, h) => {
       h.onContent?.(out);
@@ -36,7 +35,7 @@ function orchestratorReturning(...results: ToolChatResult[]): LLMClient {
   const fn = vi.fn();
   for (const r of results) fn.mockResolvedValueOnce(r);
   fn.mockResolvedValue({ content: "Done.", toolCalls: [] });
-  return { model: "v3", complete: vi.fn(), stream: vi.fn(), chatWithTools: fn };
+  return { model: "v3", stream: vi.fn(), chatWithTools: fn };
 }
 
 const okResult: QueryResult = { columns: ["n"], rows: [{ n: 5 }], rowCount: 1 };
@@ -103,7 +102,6 @@ describe("runAgent (tool-calling loop)", () => {
   it("emits an error when the step cap is exceeded", async () => {
     const orchestrator: LLMClient = {
       model: "v3",
-      complete: vi.fn(),
       stream: vi.fn(),
       chatWithTools: vi.fn().mockResolvedValue(queryCall("loop forever")),
     };

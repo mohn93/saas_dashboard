@@ -21,7 +21,8 @@ export function useConversationList() {
     // Optimistic removal.
     setConversations((prev) => prev.filter((c) => c.id !== id));
     try {
-      await fetch(`/api/agent/conversations/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/agent/conversations/${id}`, { method: "DELETE" });
+      if (!res.ok) void refresh(); // server rejected — restore the row
     } catch {
       // delete failed — re-sync from the server so the row reappears
       void refresh();

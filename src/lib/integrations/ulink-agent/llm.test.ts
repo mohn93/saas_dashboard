@@ -5,7 +5,6 @@ import type { LLMClient } from "./llm";
 function stubLLM(response: string): LLMClient {
   return {
     model: "test",
-    complete: async () => response,
     stream: async (_messages, handlers) => {
       handlers.onContent?.(response);
       return response;
@@ -126,7 +125,6 @@ describe("generateSql streaming", () => {
     const reasoningSeen: string[] = [];
     const llm: LLMClient = {
       model: "r",
-      complete: async () => "",
       stream: async (_m, h) => {
         h.onReasoning?.("let me think");
         const out = '{"sql":"SELECT 1 AS n","chart":{"type":"none","xColumn":null,"yColumn":null}}';
