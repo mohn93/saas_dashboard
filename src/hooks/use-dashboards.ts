@@ -5,6 +5,9 @@ import type { DashboardSummary } from "@/lib/integrations/ulink-agent/types";
 
 export function useDashboards({ auto = true }: { auto?: boolean } = {}) {
   const [dashboards, setDashboards] = useState<DashboardSummary[]>([]);
+  // Start true so the first render shows skeletons, not a misleading "no
+  // dashboards yet" empty state before the initial fetch resolves.
+  const [loading, setLoading] = useState(auto);
 
   const refresh = useCallback(async () => {
     try {
@@ -14,6 +17,8 @@ export function useDashboards({ auto = true }: { auto?: boolean } = {}) {
       setDashboards(data.dashboards ?? []);
     } catch {
       /* best-effort */
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -53,5 +58,5 @@ export function useDashboards({ auto = true }: { auto?: boolean } = {}) {
     if (auto) void refresh();
   }, [auto, refresh]);
 
-  return { dashboards, refresh, create, remove };
+  return { dashboards, loading, refresh, create, remove };
 }

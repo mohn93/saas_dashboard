@@ -63,6 +63,7 @@ export default function AgentPage() {
       <ConversationSidebar
         conversations={list.conversations}
         activeId={conversationId}
+        loading={list.loading}
         onNew={newChat}
         onSelect={(id) => void load(id)}
         onDelete={handleDelete}

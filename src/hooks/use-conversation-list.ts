@@ -5,6 +5,9 @@ import type { ConversationSummary } from "@/lib/integrations/ulink-agent/types";
 
 export function useConversationList() {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  // Start true so the sidebar shows skeleton rows on first paint rather than
+  // flashing "No saved chats yet." before the initial fetch resolves.
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
@@ -14,6 +17,8 @@ export function useConversationList() {
       setConversations(data.conversations ?? []);
     } catch {
       /* best-effort */
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -33,5 +38,5 @@ export function useConversationList() {
     void refresh();
   }, [refresh]);
 
-  return { conversations, refresh, remove };
+  return { conversations, loading, refresh, remove };
 }

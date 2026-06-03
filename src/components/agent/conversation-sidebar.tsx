@@ -3,17 +3,20 @@
 import { formatDistanceToNow } from "date-fns";
 import { Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ConversationSummary } from "@/lib/integrations/ulink-agent/types";
 
 export function ConversationSidebar({
   conversations,
   activeId,
+  loading,
   onNew,
   onSelect,
   onDelete,
 }: {
   conversations: ConversationSummary[];
   activeId: string | null;
+  loading?: boolean;
   onNew: () => void;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
@@ -28,7 +31,14 @@ export function ConversationSidebar({
         <Plus className="h-4 w-4" /> New chat
       </button>
       <div className="flex-1 space-y-1 overflow-y-auto">
-        {conversations.length === 0 && (
+        {loading && conversations.length === 0 &&
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="space-y-1.5 px-2 py-1.5">
+              <Skeleton className="h-3.5 w-4/5" />
+              <Skeleton className="h-2.5 w-2/5" />
+            </div>
+          ))}
+        {!loading && conversations.length === 0 && (
           <p className="px-2 py-1 text-xs text-muted-foreground">No saved chats yet.</p>
         )}
         {conversations.map((c) => (

@@ -5,9 +5,10 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Plus, Trash2, LayoutDashboard } from "lucide-react";
 import { useDashboards } from "@/hooks/use-dashboards";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function DashboardsPage() {
-  const { dashboards, create, remove } = useDashboards();
+  const { dashboards, loading, create, remove } = useDashboards();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
 
@@ -46,7 +47,19 @@ export default function DashboardsPage() {
         </button>
       </form>
 
-      {dashboards.length === 0 ? (
+      {loading && dashboards.length === 0 ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-lg border border-border/50 bg-card p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+              <Skeleton className="h-3 w-40" />
+            </div>
+          ))}
+        </div>
+      ) : dashboards.length === 0 ? (
         <div className="rounded-lg border-2 border-dashed border-border/60 p-10 text-center text-sm text-muted-foreground">
           No dashboards yet. Create one above, or pin an answer from the PM Agent.
         </div>

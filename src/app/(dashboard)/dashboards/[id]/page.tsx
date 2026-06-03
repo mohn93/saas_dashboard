@@ -7,6 +7,7 @@ import { useDashboard } from "@/hooks/use-dashboard";
 import { DashboardGrid } from "@/components/dashboard-builder/dashboard-grid";
 import { AddWidgetComposer } from "@/components/dashboard-builder/add-widget-composer";
 import { EditQueryModal } from "@/components/dashboard-builder/edit-query-modal";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ChartSpec, QueryResult } from "@/lib/integrations/ulink-agent/types";
 
 export default function DashboardDetailPage({ params }: { params: { id: string } }) {
@@ -160,7 +161,16 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
       </div>
 
       {loading && widgets.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex h-full flex-col rounded-lg border border-border/50 bg-card p-4">
+              <div className="mb-2 flex items-start gap-2">
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+              <Skeleton className="mt-2 h-40 w-full rounded-lg" />
+            </div>
+          ))}
+        </div>
       ) : (
         <DashboardGrid
           widgets={widgets}
