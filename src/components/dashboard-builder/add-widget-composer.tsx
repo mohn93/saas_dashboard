@@ -6,7 +6,8 @@ import { useAgentCompose } from "@/hooks/use-agent-compose";
 import { WidgetBody } from "./widget-body";
 import {
   widgetFromAnswer,
-  canChart,
+  canPickChart,
+  initialChartType,
   pickInitialKind,
   resolveWidgetChart,
 } from "@/lib/integrations/ulink-agent/widgets";
@@ -30,13 +31,11 @@ export function AddWidgetComposer({ onAdd }: { onAdd: (input: WidgetCreateInput)
   useEffect(() => {
     if (message?.result) {
       setKind(pickInitialKind(message.result, message.chart, message.display));
-      setChartType(message.chart && message.chart.type !== "none" ? message.chart.type : "bar");
+      setChartType(initialChartType(message.chart));
     }
   }, [message?.result, message?.chart, message?.display]);
 
-  const chartable =
-    canChart(message?.result ?? null) ||
-    !!(message?.chart && message.chart.xColumn && message.chart.yColumn);
+  const chartable = canPickChart(message?.result ?? null, message?.chart ?? null);
 
   function close() {
     setMode("tile");

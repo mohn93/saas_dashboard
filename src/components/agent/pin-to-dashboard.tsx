@@ -7,17 +7,14 @@ import { LayoutDashboard, Plus, Check } from "lucide-react";
 import { useDashboards } from "@/hooks/use-dashboards";
 import {
   widgetFromAnswer,
-  canChart,
+  canPickChart,
+  initialChartType,
   pickInitialKind,
   resolveWidgetChart,
 } from "@/lib/integrations/ulink-agent/widgets";
 import { WidgetKindPicker } from "@/components/dashboard-builder/widget-kind-picker";
 import type { AgentMessage } from "@/lib/integrations/ulink-agent/message";
 import type { ChartType, WidgetKind } from "@/lib/integrations/ulink-agent/types";
-
-function initialChartType(message: AgentMessage): ChartType {
-  return message.chart && message.chart.type !== "none" ? message.chart.type : "bar";
-}
 
 export function PinToDashboard({ message }: { message: AgentMessage }) {
   const { dashboards, create, refresh } = useDashboards({ auto: false });
@@ -28,10 +25,9 @@ export function PinToDashboard({ message }: { message: AgentMessage }) {
   const [kind, setKind] = useState<WidgetKind>(() =>
     pickInitialKind(message.result, message.chart, message.display)
   );
-  const [chartType, setChartType] = useState<ChartType>(() => initialChartType(message));
+  const [chartType, setChartType] = useState<ChartType>(() => initialChartType(message.chart));
 
-  const chartable =
-    canChart(message.result) || !!(message.chart && message.chart.xColumn && message.chart.yColumn);
+  const chartable = canPickChart(message.result, message.chart);
 
   async function pin(dashboardId: string) {
     setBusy(true);
