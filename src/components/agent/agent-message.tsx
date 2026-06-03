@@ -5,6 +5,7 @@ import { ChevronRight, Loader2, ThumbsUp, ThumbsDown, Sparkles } from "lucide-re
 import { cn } from "@/lib/utils";
 import { ResultView } from "@/components/agent/result-view";
 import { Markdown } from "@/components/agent/markdown";
+import { stripMarkdownTables } from "@/lib/markdown-utils";
 import { PinToDashboard } from "@/components/agent/pin-to-dashboard";
 import type { AgentMessage as AgentMessageType } from "@/hooks/use-agent-stream";
 import type { AgentAnswer } from "@/lib/integrations/ulink-agent/types";
@@ -95,11 +96,13 @@ export function AgentMessage({
         </div>
       )}
 
-      {/* narration */}
+      {/* narration — strip any inline markdown table when the result table renders below it */}
       {message.narration && (
         <div className="flex gap-2 text-sm">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-400" />
-          <Markdown className="min-w-0 flex-1">{message.narration}</Markdown>
+          <Markdown className="min-w-0 flex-1">
+            {message.result ? stripMarkdownTables(message.narration) : message.narration}
+          </Markdown>
         </div>
       )}
 
