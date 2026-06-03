@@ -228,6 +228,7 @@ export interface GenerateSqlInput {
   examples: AgentExample[];
   history?: ConversationTurn[];
   priorError?: string | null;
+  chartHint?: ChartSpec["type"]; // caller-requested chart type (e.g. the user asked for a pie)
 }
 
 export interface GeneratedSql {
@@ -296,6 +297,11 @@ export async function generateSql(
         `Columns:\n${cols}\n\n` +
         (fks ? `Foreign keys:\n${fks}\n\n` : "") +
         (examples ? `Proven examples:\n${examples}\n\n` : "") +
+        (input.chartHint && input.chartHint !== "none"
+          ? `The user wants a ${input.chartHint} chart. REQUIRED: shape the SELECT to return a label ` +
+            `column and a numeric value column, and set chart.type to "${input.chartHint}" with ` +
+            `xColumn = the label and yColumn = the numeric value.\n`
+          : "") +
         (input.priorError
           ? `Your previous SQL failed with: ${input.priorError}\nFix it.\n`
           : ""),
@@ -316,5 +322,10 @@ export async function generateSql(
         yColumn: (parsed.chart.yColumn as string) ?? null,
       }
     : DEFAULT_CHART;
+  // Honor a caller-requested chart type when the result has usable axes — the caller
+  // (the orchestrator, relaying the user) decides the chart, not the SQL model.
+  if (input.chartHint && input.chartHint !== "none" && chart.xColumn && chart.yColumn) {
+    chart.type = input.chartHint;
+  }
   return { sql: parsed.sql, chart };
 }

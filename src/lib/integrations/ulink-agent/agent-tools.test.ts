@@ -33,6 +33,20 @@ function reasonerReturning(sql: string): LLMClient {
   };
 }
 
+// Reasoner that returns a "bar" chart WITH usable axes (so a chart hint can override it).
+function reasonerWithBarChart(sql: string): LLMClient {
+  const out = `{"sql":${JSON.stringify(sql)},"chart":{"type":"bar","xColumn":"month","yColumn":"n"}}`;
+  return {
+    model: "r1",
+    complete: vi.fn(),
+    chatWithTools: vi.fn(),
+    stream: async (_m, h) => {
+      h.onContent?.(out);
+      return out;
+    },
+  };
+}
+
 function ctxWith(opts: {
   reasoner: LLMClient;
   execute: ToolContext["execute"];
@@ -72,6 +86,30 @@ describe("dispatchTool: query", () => {
     const parsed = JSON.parse(outcome.content);
     expect(parsed.rowCount).toBe(1);
     expect(parsed.rows).toEqual([{ n: 5 }]);
+  });
+
+  it("honors the chart arg — a pie request renders pie even if the model picked bar", async () => {
+    const events: AgentEvent[] = [];
+    const execute = vi.fn().mockResolvedValue({
+      columns: ["month", "n"],
+      rows: [{ month: "2026-04", n: 4 }],
+      rowCount: 1,
+    });
+    const ctx = ctxWith({
+      reasoner: reasonerWithBarChart("SELECT m AS month, count(*) AS n FROM s GROUP BY m"),
+      execute,
+      events,
+    });
+    await dispatchTool(
+      {
+        id: "c1",
+        name: "query",
+        arguments: JSON.stringify({ question: "cancellations per month", chart: "pie" }),
+      },
+      ctx
+    );
+    const result = events.find((e) => e.type === "result");
+    expect(result && "chart" in result && result.chart?.type).toBe("pie");
   });
 
   it("returns an error (no result event) when validation rejects the SQL", async () => {

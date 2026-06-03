@@ -88,6 +88,36 @@ describe("generateSql", () => {
     });
     expect(out.chart.type).toBe("none");
   });
+
+  it("honors a caller chartHint over the model's chart choice (when axes exist)", async () => {
+    const llm = stubLLM(
+      '{"sql":"SELECT m AS month, count(*) AS n FROM s GROUP BY m","chart":{"type":"bar","xColumn":"month","yColumn":"n"}}'
+    );
+    const out = await generateSql(llm, {
+      question: "cancellations per month",
+      columns: [],
+      foreignKeys: [],
+      examples: [],
+      chartHint: "pie",
+    });
+    expect(out.chart.type).toBe("pie"); // hint overrides the model's "bar"
+    expect(out.chart.xColumn).toBe("month");
+    expect(out.chart.yColumn).toBe("n");
+  });
+
+  it("ignores a chartHint when the result has no usable axes", async () => {
+    const llm = stubLLM(
+      '{"sql":"SELECT 1","chart":{"type":"none","xColumn":null,"yColumn":null}}'
+    );
+    const out = await generateSql(llm, {
+      question: "x",
+      columns: [],
+      foreignKeys: [],
+      examples: [],
+      chartHint: "pie",
+    });
+    expect(out.chart.type).toBe("none"); // can't force a chart without label/value columns
+  });
 });
 
 
