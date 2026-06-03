@@ -1,25 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { format, parseISO, isValid } from "date-fns";
-import * as Popover from "@radix-ui/react-popover";
+import { useState } from "react";
 import { Maximize2 } from "lucide-react";
 import { BarChart, LineChart, AreaChart, DonutChart } from "@tremor/react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { hasUsableChart, MAX_CACHED_ROWS } from "@/lib/integrations/ulink-agent/widgets";
+import { Dialog, DialogTrigger, DialogContent } from "@/components/ui/dialog";
+import { PaginatedTable } from "./data-table";
+import { hasUsableChart } from "@/lib/integrations/ulink-agent/widgets";
+import { axisLabel } from "@/lib/integrations/ulink-agent/format";
 import type { AgentAnswer, DisplayMode } from "@/lib/integrations/ulink-agent/types";
 
-const COLLAPSED_ROWS = 4;
-// The table never shows more rows than the store caches, so the UI cap tracks
-// the persist cap (one source) instead of a separate literal that can drift.
-const MAX_ROWS = MAX_CACHED_ROWS;
+// Rows shown per page inline vs. in the expanded fullscreen view.
+const INLINE_PAGE_SIZE = 10;
+const FULLSCREEN_PAGE_SIZE = 50;
 
 // Explicit, dark-theme-friendly palette so charts never fall back to Tremor's
 // default colors (which render an unreadable near-black slice on our dark bg).
@@ -39,105 +31,15 @@ const CHART_COLORS = [
   "lime",
 ];
 
-// ISO date or datetime, e.g. "2026-05-06" or "2026-05-06T04:44:25.000Z".
-const ISO_DATE_RE =
-  /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$/;
-
-function renderCell(value: unknown) {
-  if (value === null || value === undefined || value === "") {
-    return <span className="text-muted-foreground/40">—</span>;
-  }
-
-  // Humanize ISO dates/timestamps, with the exact date on hover (no raw ISO).
-  if (typeof value === "string" && ISO_DATE_RE.test(value)) {
-    const d = parseISO(value);
-    if (isValid(d)) {
-      const hasTime = /[T ]\d{2}:\d{2}/.test(value);
-      const display = hasTime
-        ? format(d, "MMM d, yyyy, h:mm a")
-        : format(d, "MMM d, yyyy");
-      const exact = hasTime
-        ? format(d, "EEEE, MMMM d, yyyy 'at' h:mm:ss a")
-        : format(d, "EEEE, MMMM d, yyyy");
-      return (
-        <span
-          title={exact}
-          aria-label={exact}
-          tabIndex={0}
-          className="cursor-help whitespace-nowrap underline decoration-dotted decoration-muted-foreground/40 underline-offset-2"
-        >
-          {display}
-        </span>
-      );
-    }
-  }
-
-  if (typeof value === "object") {
-    return <span className="font-mono text-xs">{JSON.stringify(value)}</span>;
-  }
-
-  return <span>{String(value)}</span>;
-}
-
-// Plain-string form of a cell value, for the expand popup.
-function cellFullText(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "object") return JSON.stringify(value, null, 2);
-  return String(value);
-}
-
-// A single-line, ellipsized cell. When the content is actually truncated, an
-// expand icon appears on hover and opens a popup with the full value.
-function TruncatedCell({ value }: { value: unknown }) {
-  const spanRef = useRef<HTMLSpanElement>(null);
-  const [overflowing, setOverflowing] = useState(false);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    const el = spanRef.current;
-    if (el) setOverflowing(el.scrollWidth > el.clientWidth + 1);
-  }, [value]);
-
-  return (
-    <div className="group/cell flex items-center gap-1">
-      <span ref={spanRef} className="block max-w-[18rem] truncate">
-        {renderCell(value)}
-      </span>
-      {overflowing && (
-        <Popover.Root open={open} onOpenChange={setOpen}>
-          <Popover.Trigger asChild>
-            <button
-              type="button"
-              aria-label="Show full value"
-              className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus:opacity-100 group-hover/cell:opacity-100 data-[state=open]:opacity-100"
-            >
-              <Maximize2 className="h-3 w-3" />
-            </button>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content
-              align="start"
-              sideOffset={6}
-              className="z-50 max-h-80 w-[min(28rem,90vw)] overflow-auto rounded-lg border border-border/50 bg-card p-3 shadow-lg"
-            >
-              <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
-                {cellFullText(value)}
-              </pre>
-            </Popover.Content>
-          </Popover.Portal>
-        </Popover.Root>
-      )}
-    </div>
-  );
-}
-
 function Chart({ answer }: { answer: AgentAnswer }) {
   const { chart, result } = answer;
   if (!result || !hasUsableChart(chart)) return null;
   const xCol = chart.xColumn;
   const yCol = chart.yColumn;
+  // Humanize the x value (ISO dates → "Aug 29, 2025") so axis ticks and tooltips
+  // never show raw "2025-08-29T00:00:00.000Z".
   const data = result.rows.map((r) => ({
-    [xCol]: String(r[xCol]),
+    [xCol]: axisLabel(r[xCol]),
     [yCol]: Number(r[yCol]) || 0,
   }));
   const categories: string[] = [yCol];
@@ -174,12 +76,13 @@ function Chart({ answer }: { answer: AgentAnswer }) {
 export function ResultView({
   answer,
   display = "both",
+  title = "Result",
 }: {
   answer: AgentAnswer;
   display?: DisplayMode;
+  title?: string;
 }) {
   const [showSql, setShowSql] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const [showTable, setShowTable] = useState(display !== "chart");
 
   if (!answer.ok) {
@@ -194,10 +97,6 @@ export function ResultView({
   }
 
   const result = answer.result!;
-  const cappedRows = result.rows.slice(0, MAX_ROWS);
-  const visibleRows = expanded ? cappedRows : cappedRows.slice(0, COLLAPSED_ROWS);
-  const hiddenCount = cappedRows.length - visibleRows.length;
-
   const showChart = display !== "table";
   const tableCollapsible = display === "chart";
   const tableVisible = !tableCollapsible || showTable;
@@ -218,54 +117,35 @@ export function ResultView({
 
       {tableVisible && (
         <>
-          <div className="overflow-x-auto rounded-lg border border-border/50">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {result.columns.map((c) => (
-                    <TableHead key={c}>{c}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibleRows.map((row, i) => (
-                  <TableRow key={i}>
-                    {result.columns.map((c) => (
-                      <TableCell key={c}>
-                        <TruncatedCell value={row[c]} />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <PaginatedTable result={result} pageSize={INLINE_PAGE_SIZE} />
 
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-xs text-muted-foreground">
-              {result.rowCount} row{result.rowCount === 1 ? "" : "s"}
-              {result.rowCount > MAX_ROWS ? ` (first ${MAX_ROWS} shown)` : ""}
-              {!expanded && hiddenCount > 0 ? ` · showing ${visibleRows.length}` : ""}
-            </p>
-            {cappedRows.length > COLLAPSED_ROWS && (
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <Dialog>
+              <DialogTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-1 font-medium text-violet-400 hover:text-violet-300"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" /> Expand
+                </button>
+              </DialogTrigger>
+              <DialogContent title={title} description="Full query result, paginated">
+                <PaginatedTable result={result} pageSize={FULLSCREEN_PAGE_SIZE} />
+              </DialogContent>
+            </Dialog>
+
+            {answer.sql && (
               <button
                 type="button"
-                onClick={() => setExpanded((e) => !e)}
-                className="text-xs font-medium text-violet-400 hover:text-violet-300"
+                onClick={() => setShowSql((s) => !s)}
+                className="ml-auto text-muted-foreground underline-offset-2 hover:underline"
               >
-                {expanded ? "Show less" : `Show all ${cappedRows.length}`}
+                {showSql ? "Hide SQL" : "View SQL"}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setShowSql((s) => !s)}
-              className="ml-auto text-xs text-muted-foreground underline-offset-2 hover:underline"
-            >
-              {showSql ? "Hide SQL" : "View SQL"}
-            </button>
           </div>
 
-          {showSql && (
+          {showSql && answer.sql && (
             <pre className="overflow-x-auto rounded-lg border border-border/50 bg-muted/30 p-3 text-xs">
               {answer.sql}
             </pre>

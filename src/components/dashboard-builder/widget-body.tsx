@@ -37,5 +37,5 @@ export function WidgetBody({ widget }: { widget: Widget }) {
     chart: widget.kind === "chart" ? widget.chart : { type: "none", xColumn: null, yColumn: null },
     result: widget.result,
   });
-  return <ResultView answer={answer} display={widget.display} />;
+  return <ResultView answer={answer} display={widget.display} title={widget.title} />;
 }

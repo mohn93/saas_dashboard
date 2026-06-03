@@ -103,7 +103,9 @@ export function AgentMessage({
       )}
 
       {/* result table/chart */}
-      {resultAnswer && <ResultView answer={resultAnswer} display={message.display} />}
+      {resultAnswer && (
+        <ResultView answer={resultAnswer} display={message.display} title={message.question} />
+      )}
 
       {/* feedback + pin */}
       {finished && !message.error && (message.logId || message.result) && (

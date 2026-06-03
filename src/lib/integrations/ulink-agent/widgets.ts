@@ -19,7 +19,9 @@ export function buildAnswer(parts: {
 }
 
 export const STALE_MS = 5 * 60_000; // auto-refresh widgets whose cache is older than 5 min
-export const MAX_CACHED_ROWS = 100; // cap rows stored in cached_result (chart/table need few)
+// Cap rows stored in cached_result. Matches the agent's SQL LIMIT (validate.ts)
+// so a pinned widget can paginate through the same full result the chat showed.
+export const MAX_CACHED_ROWS = 1000;
 
 export interface WidgetCreateInput {
   kind: WidgetKind;
