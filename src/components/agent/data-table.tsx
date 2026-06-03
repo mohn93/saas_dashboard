@@ -147,8 +147,10 @@ export function PaginatedTable({
         <span aria-live="polite">
           {total === 0
             ? "No rows"
-            : `${(start + 1).toLocaleString()}–${end.toLocaleString()} of ${total.toLocaleString()}`}
-          {capped ? ` (of ${result.rowCount.toLocaleString()} total)` : " row" + (total === 1 ? "" : "s")}
+            : `${(start + 1).toLocaleString()}–${end.toLocaleString()} of ${total.toLocaleString()} row${
+                total === 1 ? "" : "s"
+              }`}
+          {capped ? ` · ${result.rowCount.toLocaleString()} total (cached ${total.toLocaleString()})` : ""}
         </span>
         {pageCount > 1 && (
           <div className="flex items-center gap-1">
