@@ -45,6 +45,11 @@ export function AgentMessage({
       }
     : null;
 
+  // Strip any inline markdown table from the narration when the result table renders below it.
+  const displayNarration = message.result
+    ? stripMarkdownTables(message.narration)
+    : message.narration;
+
   return (
     <div className="space-y-3">
       {/* user question */}
@@ -96,13 +101,11 @@ export function AgentMessage({
         </div>
       )}
 
-      {/* narration — strip any inline markdown table when the result table renders below it */}
-      {message.narration && (
+      {/* narration (inline markdown table stripped when the result table renders below) */}
+      {displayNarration && (
         <div className="flex gap-2 text-sm">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-400" />
-          <Markdown className="min-w-0 flex-1">
-            {message.result ? stripMarkdownTables(message.narration) : message.narration}
-          </Markdown>
+          <Markdown className="min-w-0 flex-1">{displayNarration}</Markdown>
         </div>
       )}
 
