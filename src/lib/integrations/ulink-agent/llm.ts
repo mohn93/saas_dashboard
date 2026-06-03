@@ -117,6 +117,13 @@ export function getFastClient(): LLMClient {
   return buildClient(process.env.DEEPSEEK_FAST_MODEL || "deepseek-chat");
 }
 
+// The planner decides chat-vs-data and recovers follow-up intent — the step where
+// "understand what the user means" matters most. Default it to the stronger reasoner;
+// override with DEEPSEEK_PLANNER_MODEL (e.g. "deepseek-chat") to A/B without a redeploy.
+export function getPlannerClient(): LLMClient {
+  return buildClient(process.env.DEEPSEEK_PLANNER_MODEL || "deepseek-reasoner");
+}
+
 export function extractJson(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const body = (fenced ? fenced[1] : text).trim();
@@ -198,7 +205,7 @@ export interface PlanResult {
 }
 
 export async function planMessage(
-  fast: LLMClient,
+  planner: LLMClient,
   question: string,
   history: ConversationTurn[],
   tables: TableSummary[]
@@ -225,7 +232,7 @@ export async function planMessage(
     },
   ];
   try {
-    const raw = await fast.complete(messages);
+    const raw = await planner.complete(messages);
     const parsed = extractJson(raw) as { kind?: string; reply?: string };
     if (parsed?.kind === "chat") {
       return {

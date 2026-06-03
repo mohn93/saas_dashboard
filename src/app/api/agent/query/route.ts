@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { runAgent } from "@/lib/integrations/ulink-agent/loop";
-import { getDeepSeekClient, getFastClient } from "@/lib/integrations/ulink-agent/llm";
+import { getDeepSeekClient, getFastClient, getPlannerClient } from "@/lib/integrations/ulink-agent/llm";
 import { supabaseMemory } from "@/lib/integrations/ulink-agent/memory";
 import { conversationStore, persistTurn } from "@/lib/integrations/ulink-agent/conversations";
 import { executeReadOnly } from "@/lib/integrations/ulink-agent/client";
@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
             {
               reasoner: getDeepSeekClient(),
               fast: getFastClient(),
+              planner: getPlannerClient(),
               memory: supabaseMemory,
               execute: executeReadOnly,
             },

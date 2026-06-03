@@ -6,6 +6,7 @@ import type { ChartSpec, ConversationTurn, MemoryStore, QueryResult } from "./ty
 export interface AgentDeps {
   reasoner: LLMClient;
   fast: LLMClient;
+  planner?: LLMClient; // model for chat-vs-data planning; falls back to `fast`
   memory: MemoryStore;
   execute: (sql: string) => Promise<QueryResult>;
   maxRows?: number;
@@ -30,7 +31,7 @@ export async function runAgent(
   try {
     emit({ type: "phase", phase: "planning" });
     const summaries = await deps.memory.getTableSummaries();
-    const plan = await planMessage(deps.fast, input.question, history, summaries);
+    const plan = await planMessage(deps.planner ?? deps.fast, input.question, history, summaries);
 
     // --- chat path: no query, just a conversational reply ---
     if (plan.kind === "chat") {
