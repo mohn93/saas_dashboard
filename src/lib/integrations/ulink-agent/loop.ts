@@ -32,8 +32,9 @@ function buildSystemPrompt(tables: TableSummary[]): string {
       "and tables — NEVER tell the user you can't, and never send them to a spreadsheet. When they want " +
       "a chart (e.g. a pie chart), run a `query` whose result is chart-friendly: one label column plus " +
       "one numeric column — usually an aggregate like a count or sum grouped by a category or time " +
-      "bucket (e.g. cancellations per month) — and you may name the chart type in the question " +
-      "(e.g. 'as a pie chart'). Then tell the user the chart and table are shown below.",
+      "bucket (e.g. cancellations per month). When the user asks for a SPECIFIC chart type, pass it in " +
+      "the `query` tool's `chart` argument (e.g. chart: \"pie\") so it is honored — do not rely on " +
+      "phrasing alone. Then tell the user the chart and table are shown below.",
     "Rules:",
     "- A pasted URL, short link, slug, email, or ID is a DATA lookup — use `query` to find it; never say you can't browse the web.",
     "- If a reference is ambiguous ('he', 'it', 'this', 'his project') with no clear antecedent in the conversation, call `clarify` — do not guess or invent an entity.",

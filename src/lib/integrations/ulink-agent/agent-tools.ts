@@ -1,7 +1,8 @@
 import { generateSql, type LLMClient, type ParsedToolCall, type ToolDef } from "./llm";
 import { validateSelect } from "./validate";
+import { CHART_TYPES } from "./types";
 import type { AgentEvent } from "./events";
-import type { MemoryStore, QueryResult } from "./types";
+import type { ChartSpec, MemoryStore, QueryResult } from "./types";
 
 export const QUERY_TOOL = "query";
 export const CLARIFY_TOOL = "clarify";
@@ -22,6 +23,14 @@ export const TOOL_DEFS: ToolDef[] = [
           question: {
             type: "string",
             description: "A self-contained data question in plain English.",
+          },
+          chart: {
+            type: "string",
+            enum: [...CHART_TYPES],
+            description:
+              "Optional: the chart type to render when the user asked for a specific one " +
+              "(e.g. 'pie'). Honored as long as the result has a label column + a numeric column. " +
+              "Omit to let the system pick automatically.",
           },
         },
         required: ["question"],
@@ -62,7 +71,11 @@ export interface ToolOutcome {
   clarify?: string; // set by clarify → the loop terminates, asking this question
 }
 
-async function runQuery(question: string, ctx: ToolContext): Promise<ToolOutcome> {
+async function runQuery(
+  question: string,
+  ctx: ToolContext,
+  chartHint?: ChartSpec["type"]
+): Promise<ToolOutcome> {
   ctx.emit({ type: "step", label: "Querying", detail: question });
 
   const summaries = await ctx.memory.getTableSummaries();
@@ -77,7 +90,7 @@ async function runQuery(question: string, ctx: ToolContext): Promise<ToolOutcome
   try {
     gen = await generateSql(
       ctx.reasoner,
-      { question, columns, foreignKeys, examples },
+      { question, columns, foreignKeys, examples, chartHint },
       (delta) => ctx.emit({ type: "reasoning", delta })
     );
   } catch (err) {
@@ -155,17 +168,20 @@ export async function dispatchTool(
   call: ParsedToolCall,
   ctx: ToolContext
 ): Promise<ToolOutcome> {
-  let args: { question?: unknown };
+  let args: { question?: unknown; chart?: unknown };
   try {
     args = JSON.parse(call.arguments || "{}");
   } catch {
     return { content: JSON.stringify({ error: `Invalid JSON arguments for ${call.name}` }) };
   }
   const question = typeof args.question === "string" ? args.question.trim() : "";
+  const chartHint = CHART_TYPES.includes(args.chart as (typeof CHART_TYPES)[number])
+    ? (args.chart as ChartSpec["type"])
+    : undefined;
 
   if (call.name === QUERY_TOOL) {
     if (!question) return { content: JSON.stringify({ error: "query requires a 'question' string" }) };
-    return runQuery(question, ctx);
+    return runQuery(question, ctx, chartHint);
   }
   if (call.name === CLARIFY_TOOL) {
     if (!question) return { content: JSON.stringify({ error: "clarify requires a 'question' string" }) };
