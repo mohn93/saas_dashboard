@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { RefreshCw, Trash2, GripVertical, Pencil } from "lucide-react";
 import { WidgetBody } from "./widget-body";
@@ -40,6 +41,21 @@ export function DashboardWidget({
   onEditQuery: () => void;
 }) {
   const isQuery = widget.kind !== "text";
+  // Inline title editing (edit mode only). Draft is null when not editing.
+  const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  // Set on Escape so the blur that follows discards instead of committing
+  // (state updates are async, so blur can't see a just-reset draft).
+  const cancelTitleRef = useRef(false);
+  function commitTitle() {
+    if (cancelTitleRef.current) {
+      cancelTitleRef.current = false;
+      setTitleDraft(null);
+      return;
+    }
+    const next = titleDraft?.trim();
+    if (next && next !== widget.title) onPatch({ title: next });
+    setTitleDraft(null);
+  }
   const freshness = widget.refreshError
     ? "couldn't refresh — showing cached"
     : widget.cachedAt
@@ -62,7 +78,26 @@ export function DashboardWidget({
           </button>
         )}
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold">{widget.title}</h3>
+          {editing ? (
+            <input
+              value={titleDraft ?? widget.title}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                } else if (e.key === "Escape") {
+                  cancelTitleRef.current = true;
+                  e.currentTarget.blur();
+                }
+              }}
+              aria-label="Widget title"
+              className="w-full rounded-md border border-border/50 bg-background px-2 py-1 text-sm font-semibold outline-none focus:border-violet-500"
+            />
+          ) : (
+            <h3 className="truncate text-sm font-semibold">{widget.title}</h3>
+          )}
           {freshness && (
             <p className={cn("text-xs", widget.refreshError ? "text-amber-500" : "text-muted-foreground")}>
               {freshness}
