@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractJson, selectTables, generateSql, parseSseLine, planMessage, parseToolCalls } from "./llm";
+import { extractJson, generateSql, parseSseLine, parseToolCalls } from "./llm";
 import type { LLMClient } from "./llm";
 
 function stubLLM(response: string): LLMClient {
@@ -26,24 +26,6 @@ describe("extractJson", () => {
   });
 });
 
-describe("selectTables", () => {
-  it("returns the intersection with known tables", async () => {
-    const llm = stubLLM('["users", "unknown_table"]');
-    const out = await selectTables(llm, "how many users", [
-      { table: "users", description: null },
-      { table: "projects", description: null },
-    ]);
-    expect(out).toEqual(["users"]);
-  });
-
-  it("falls back to all tables when parsing fails", async () => {
-    const llm = stubLLM("not json");
-    const out = await selectTables(llm, "q", [
-      { table: "users", description: null },
-    ]);
-    expect(out).toEqual(["users"]);
-  });
-});
 
 describe("parseSseLine", () => {
   it("parses a content delta", () => {
@@ -80,24 +62,6 @@ describe("generateSql", () => {
   });
 });
 
-describe("planMessage", () => {
-  it("classifies a data question", async () => {
-    const llm = stubLLM('{"kind":"data"}');
-    const out = await planMessage(llm, "how many links?", [], [{ table: "links", description: null }]);
-    expect(out.kind).toBe("data");
-  });
-  it("classifies chat and returns a reply", async () => {
-    const llm = stubLLM('{"kind":"chat","reply":"Hi! Ask me about ULink data."}');
-    const out = await planMessage(llm, "hello", [], []);
-    expect(out.kind).toBe("chat");
-    expect(out.reply).toContain("Hi");
-  });
-  it("falls back to data on parse failure", async () => {
-    const llm = stubLLM("not json");
-    const out = await planMessage(llm, "x", [], []);
-    expect(out.kind).toBe("data");
-  });
-});
 
 describe("generateSql streaming", () => {
   it("emits reasoning deltas and returns sql", async () => {
