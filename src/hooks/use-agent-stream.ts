@@ -36,6 +36,8 @@ export function useAgentStream(
         sql: m.sql,
         ok: m.error === null,
         error: m.error,
+        // the assistant's reply (data narration or chat reply both land in `narration`)
+        answer: m.narration ? m.narration : null,
       }));
 
     setMessages((prev) => [...prev, emptyMessage(id, question)]);

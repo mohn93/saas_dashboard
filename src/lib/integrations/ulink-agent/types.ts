@@ -40,6 +40,7 @@ export interface ConversationTurn {
   sql: string | null;
   ok: boolean;
   error: string | null;
+  answer?: string | null; // the assistant's prior reply/narration, so the agent sees its own thread
 }
 
 export interface AgentAnswer {
