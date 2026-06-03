@@ -211,7 +211,13 @@ export async function planMessage(
   tables: TableSummary[]
 ): Promise<PlanResult> {
   const tableList = tables.map((t) => `- ${t.table}`).join("\n");
-  const recent = history.map((h) => `Q: ${h.question}${h.ok ? "" : " (failed)"}`).join("\n");
+  const recent = history
+    .map(
+      (h) =>
+        `Q: ${h.question}` +
+        (h.answer ? `\nA: ${h.answer}` : h.ok ? "" : " (the attempt failed)")
+    )
+    .join("\n");
   const messages: LLMMessage[] = [
     {
       role: "system",
@@ -221,7 +227,14 @@ export async function planMessage(
         '{"kind":"data"} if it asks about ULink data/metrics, or ' +
         '{"kind":"chat","reply":"..."} for greetings, thanks, clarifications, or general ' +
         "questions, where reply is a brief, friendly answer. If the user refers to a previous " +
-        "question (e.g. 'try again', 'now by month'), treat it as data.",
+        "question (e.g. 'try again', 'now by month'), treat it as data. " +
+        "A pasted URL, short link, slug, email, or ID is a DATA lookup (search the data for it) — " +
+        "NEVER reply that you can't browse the web. " +
+        "If the user is answering a clarifying question you asked, or refining a metric definition, " +
+        "continue that thread as data once the definition is clear. " +
+        "If the message refers to an entity ambiguously ('he', 'it', 'this', 'his project') with no " +
+        "clear referent in the recent conversation, return kind:chat whose reply briefly asks which " +
+        "one they mean — do NOT guess or invent an entity.",
     },
     {
       role: "user",
@@ -266,7 +279,10 @@ export async function narrate(
         "You are a data analyst assistant for ULink. Given a question and its query results, " +
         "write a concise, friendly answer (1-4 sentences) stating the key numbers/findings. " +
         "Only use values present in the results; never invent data. Do not show SQL. " +
-        "If rowCount is 0, say no matching data was found.",
+        "If rowCount is 0, say no matching data was found. " +
+        "If the result is a single row whose values are all NULL/empty, or whose key identifying " +
+        "column(s) are NULL/empty, treat it as NO MATCH — say nothing was found; do NOT describe a " +
+        "NULL/empty result as if it were a real entity or finding.",
     },
     {
       role: "user",
@@ -314,7 +330,9 @@ export async function generateSql(
   const history = (input.history ?? [])
     .map((h) =>
       h.ok
-        ? `Earlier question: ${h.question}\nSQL used: ${h.sql}`
+        ? `Earlier question: ${h.question}` +
+          (h.sql ? `\nSQL used: ${h.sql}` : "") +
+          (h.answer ? `\nAssistant answered: ${h.answer}` : "")
         : `Earlier question: ${h.question}\nThat attempt FAILED` +
           (h.error ? ` (error: ${h.error})` : "") +
           (h.sql ? `\nFailed SQL: ${h.sql}` : "")
@@ -331,6 +349,9 @@ export async function generateSql(
         "use 'Conversation so far' to recover the actual data question and answer THAT — " +
         "if an earlier attempt FAILED, re-attempt the same intent. " +
         "Always return a real analytical query against the schema; never a placeholder like SELECT 'ok'. " +
+        "When checking whether a specific entity exists or matches an identifier (slug/email/id), " +
+        "filter in WHERE so the query returns ZERO rows when there is no match; do NOT use scalar " +
+        "sub-selects that always return one (possibly all-NULL) row. " +
         'Reply with ONLY JSON: {"sql": string, "chart": {"type": "bar"|"line"|"area"|"none", ' +
         '"xColumn": string|null, "yColumn": string|null}}. ' +
         "Choose a chart only if the result is naturally chartable; otherwise type \"none\".",
