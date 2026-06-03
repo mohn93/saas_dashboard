@@ -19,6 +19,16 @@ export default function AgentPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
   const prevLenRef = useRef(0);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow the composer from one line up to ~8 lines, then scroll internally,
+  // so a long question is readable instead of cropped to a single line.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.min(el.scrollHeight, 192)}px`;
+  }, [input]);
 
   function onScroll() {
     const el = scrollRef.current;
@@ -35,7 +45,7 @@ export default function AgentPage() {
     if (newMessage || stickRef.current) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  function submit(e: React.FormEvent) {
+  function submit(e: { preventDefault: () => void }) {
     e.preventDefault();
     const q = input.trim();
     if (!q || busy) return; // one stream at a time — ignore submits while streaming
@@ -81,13 +91,22 @@ export default function AgentPage() {
           ))}
         </div>
 
-        <form onSubmit={submit} className="mt-auto flex gap-2 border-t border-border/50 pt-4">
-          <input
+        <form onSubmit={submit} className="mt-auto flex items-end gap-2 border-t border-border/50 pt-4">
+          <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter sends; Shift+Enter inserts a newline for multi-line questions.
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submit(e);
+              }
+            }}
+            rows={1}
             aria-label="Ask a question about ULink data"
             placeholder="Ask a question about ULink data…"
-            className="flex-1 rounded-lg border border-border/50 bg-background px-3 py-2 text-sm outline-none focus:border-violet-500"
+            className="max-h-48 flex-1 resize-none rounded-lg border border-border/50 bg-background px-3 py-2 text-sm leading-relaxed outline-none focus:border-violet-500"
           />
           <button
             type="submit"
