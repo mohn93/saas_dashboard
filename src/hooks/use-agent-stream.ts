@@ -26,6 +26,10 @@ export function useAgentStream(
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // True while a past conversation is being fetched, so the thread shows a
+  // skeleton instead of the *previous* conversation's messages until the new
+  // ones arrive (the stale-then-swap flash).
+  const [loadingThread, setLoadingThread] = useState(false);
 
   // Cancellation: each run gets a monotonic token; switching conversations,
   // starting a new chat, or asking again aborts the in-flight fetch and
@@ -139,6 +143,7 @@ export function useAgentStream(
   async function load(id: string) {
     cancelInFlight(); // a stream from the previous conversation must not bleed in
     setBusy(false);
+    setLoadingThread(true);
     try {
       const res = await fetch(`/api/agent/conversations/${id}`);
       if (!res.ok) return;
@@ -150,6 +155,8 @@ export function useAgentStream(
       setConversationId(id);
     } catch {
       /* best-effort */
+    } finally {
+      setLoadingThread(false);
     }
   }
 
@@ -160,5 +167,5 @@ export function useAgentStream(
     setConversationId(null);
   }
 
-  return { messages, conversationId, busy, ask, sendFeedback, load, newChat };
+  return { messages, conversationId, busy, loadingThread, ask, sendFeedback, load, newChat };
 }

@@ -17,6 +17,7 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
     widgets,
     loading,
     notFound,
+    refreshingIds,
     refreshWidget,
     refreshAll,
     addWidget,
@@ -175,6 +176,7 @@ export default function DashboardDetailPage({ params }: { params: { id: string }
         <DashboardGrid
           widgets={widgets}
           editing={editing}
+          refreshingIds={refreshingIds}
           onReorder={reorder}
           onRefreshWidget={refreshWidget}
           onPatchWidget={updateWidget}

@@ -39,6 +39,7 @@ function kindPatch(kind: WidgetKind, widget: Widget): WidgetPatch {
 export function DashboardWidget({
   widget,
   editing,
+  refreshing = false,
   dragHandleProps,
   onRefresh,
   onPatch,
@@ -47,6 +48,7 @@ export function DashboardWidget({
 }: {
   widget: Widget;
   editing: boolean;
+  refreshing?: boolean;
   dragHandleProps?: Record<string, unknown>;
   onRefresh: () => void;
   onPatch: (patch: WidgetPatch) => void;
@@ -69,7 +71,9 @@ export function DashboardWidget({
     if (next && next !== widget.title) onPatch({ title: next });
     setTitleDraft(null);
   }
-  const freshness = widget.refreshError
+  const freshness = refreshing
+    ? "refreshing…"
+    : widget.refreshError
     ? "couldn't refresh — showing cached"
     : widget.cachedAt
     ? `updated ${formatDistanceToNow(new Date(widget.cachedAt), { addSuffix: true })}`
@@ -121,15 +125,19 @@ export function DashboardWidget({
           <button
             type="button"
             onClick={onRefresh}
-            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            disabled={refreshing}
+            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:hover:bg-transparent"
             aria-label="Refresh"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
           </button>
         )}
       </div>
 
-      <div className="flex-1">
+      <div
+        className={cn("flex-1 transition-opacity", refreshing && "animate-pulse opacity-60")}
+        aria-busy={refreshing}
+      >
         <WidgetBody widget={widget} />
       </div>
 

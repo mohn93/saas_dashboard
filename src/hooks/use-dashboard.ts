@@ -14,13 +14,27 @@ export function useDashboard(id: string) {
   const [widgets, setWidgets] = useState<Widget[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  // Ids of widgets with an in-flight refresh, so each cell can show a subtle
+  // "refreshing" shimmer over its still-visible cached data.
+  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(() => new Set());
 
   const setWidget = useCallback((wid: string, fn: (w: Widget) => Widget) => {
     setWidgets((prev) => prev.map((w) => (w.id === wid ? fn(w) : w)));
   }, []);
 
+  const markRefreshing = useCallback((wid: string, on: boolean) => {
+    setRefreshingIds((prev) => {
+      if (on === prev.has(wid)) return prev;
+      const next = new Set(prev);
+      if (on) next.add(wid);
+      else next.delete(wid);
+      return next;
+    });
+  }, []);
+
   const refreshWidget = useCallback(
     async (wid: string) => {
+      markRefreshing(wid, true);
       try {
         const res = await fetch(`/api/agent/widgets/${wid}/refresh`, { method: "POST" });
         if (!res.ok) {
@@ -36,9 +50,11 @@ export function useDashboard(id: string) {
         }));
       } catch {
         setWidget(wid, (w) => ({ ...w, refreshError: true }));
+      } finally {
+        markRefreshing(wid, false);
       }
     },
-    [setWidget]
+    [setWidget, markRefreshing]
   );
 
   const load = useCallback(async () => {
@@ -165,6 +181,7 @@ export function useDashboard(id: string) {
     widgets,
     loading,
     notFound,
+    refreshingIds,
     refreshWidget,
     refreshAll,
     addWidget,

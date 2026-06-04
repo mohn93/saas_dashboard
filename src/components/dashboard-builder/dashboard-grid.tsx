@@ -31,6 +31,7 @@ const SPAN_CLASS: Record<number, string> = {
 function SortableCell({
   widget,
   editing,
+  refreshing,
   onRefresh,
   onPatch,
   onRemove,
@@ -38,6 +39,7 @@ function SortableCell({
 }: {
   widget: Widget;
   editing: boolean;
+  refreshing: boolean;
   onRefresh: () => void;
   onPatch: (patch: WidgetPatch) => void;
   onRemove: () => void;
@@ -57,6 +59,7 @@ function SortableCell({
       <DashboardWidget
         widget={widget}
         editing={editing}
+        refreshing={refreshing}
         dragHandleProps={{ ...attributes, ...listeners }}
         onRefresh={onRefresh}
         onPatch={onPatch}
@@ -70,6 +73,7 @@ function SortableCell({
 export function DashboardGrid({
   widgets,
   editing,
+  refreshingIds,
   onReorder,
   onRefreshWidget,
   onPatchWidget,
@@ -79,6 +83,7 @@ export function DashboardGrid({
 }: {
   widgets: Widget[];
   editing: boolean;
+  refreshingIds?: Set<string>;
   onReorder: (orderedIds: string[]) => void;
   onRefreshWidget: (id: string) => void;
   onPatchWidget: (id: string, patch: WidgetPatch) => void;
@@ -110,6 +115,7 @@ export function DashboardGrid({
               key={w.id}
               widget={w}
               editing={editing}
+              refreshing={refreshingIds?.has(w.id) ?? false}
               onRefresh={() => onRefreshWidget(w.id)}
               onPatch={(patch) => onPatchWidget(w.id, patch)}
               onRemove={() => onRemoveWidget(w.id)}

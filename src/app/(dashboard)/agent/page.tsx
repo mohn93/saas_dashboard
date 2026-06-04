@@ -6,13 +6,38 @@ import { useAgentStream } from "@/hooks/use-agent-stream";
 import { useConversationList } from "@/hooks/use-conversation-list";
 import { AgentMessage } from "@/components/agent/agent-message";
 import { ConversationSidebar } from "@/components/agent/conversation-sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Skeleton for the thread while a saved conversation is being fetched — mirrors
+// the AgentMessage shape (question bubble → narration lines → result block) so
+// the layout doesn't jump when the real messages arrive.
+function ThreadSkeleton() {
+  return (
+    <div className="space-y-6" aria-hidden>
+      {Array.from({ length: 2 }).map((_, i) => (
+        <div key={i} className="space-y-3">
+          <Skeleton className="h-9 w-2/3 rounded-lg" />
+          <div className="flex gap-2">
+            <Skeleton className="mt-0.5 h-4 w-4 shrink-0 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-3.5 w-full" />
+              <Skeleton className="h-3.5 w-5/6" />
+              <Skeleton className="h-3.5 w-3/4" />
+            </div>
+          </div>
+          <Skeleton className="h-44 w-full rounded-lg" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function AgentPage() {
   const list = useConversationList();
   const onConversation = useCallback(() => {
     void list.refresh();
   }, [list.refresh]);
-  const { messages, conversationId, busy, ask, sendFeedback, load, newChat } =
+  const { messages, conversationId, busy, loadingThread, ask, sendFeedback, load, newChat } =
     useAgentStream(onConversation);
   const [input, setInput] = useState("");
 
@@ -82,14 +107,20 @@ export default function AgentPage() {
 
         <div ref={scrollRef} onScroll={onScroll} className="mt-6 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-3xl space-y-6 pb-4">
-            {messages.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                e.g. &ldquo;How many signups per week over the last 8 weeks?&rdquo;
-              </p>
+            {loadingThread ? (
+              <ThreadSkeleton />
+            ) : (
+              <>
+                {messages.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    e.g. &ldquo;How many signups per week over the last 8 weeks?&rdquo;
+                  </p>
+                )}
+                {messages.map((m) => (
+                  <AgentMessage key={m.id} message={m} onFeedback={sendFeedback} />
+                ))}
+              </>
             )}
-            {messages.map((m) => (
-              <AgentMessage key={m.id} message={m} onFeedback={sendFeedback} />
-            ))}
           </div>
         </div>
 
