@@ -1,5 +1,6 @@
 import { getGAClient } from "./client";
 import { DateRange } from "@/lib/types";
+import { withInternalSourceExcluded } from "./internal-source-filter";
 
 function dateRangeToGA(range: DateRange) {
   return [{ startDate: range.start, endDate: range.end }];
@@ -20,7 +21,7 @@ export async function fetchKPIs(propertyId: string, range: DateRange, dimensionF
       { name: "averageSessionDuration" },
       { name: "bounceRate" },
     ],
-    ...(dimensionFilter && { dimensionFilter }),
+    dimensionFilter: withInternalSourceExcluded(dimensionFilter),
   });
   return response;
 }
@@ -43,7 +44,7 @@ export async function fetchDashboardKPIs(propertyId: string, range: DateRange, d
       { name: "averageSessionDuration" },
       { name: "bounceRate" },
     ],
-    ...(dimensionFilter && { dimensionFilter }),
+    dimensionFilter: withInternalSourceExcluded(dimensionFilter),
   });
   return response;
 }
@@ -64,7 +65,7 @@ export async function fetchVisitorsOverTime(
       { name: "sessions" },
     ],
     orderBys: [{ dimension: { dimensionName: "date", orderType: "ALPHANUMERIC" } }],
-    ...(dimensionFilter && { dimensionFilter }),
+    dimensionFilter: withInternalSourceExcluded(dimensionFilter),
   });
   return response;
 }
@@ -79,7 +80,7 @@ export async function fetchTopPages(propertyId: string, range: DateRange, dimens
     metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }],
     orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
     limit: 20,
-    ...(dimensionFilter && { dimensionFilter }),
+    dimensionFilter: withInternalSourceExcluded(dimensionFilter),
   });
   return response;
 }
@@ -93,7 +94,7 @@ export async function fetchReferrers(propertyId: string, range: DateRange, dimen
     metrics: [{ name: "sessions" }, { name: "totalUsers" }],
     orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
     limit: 20,
-    ...(dimensionFilter && { dimensionFilter }),
+    dimensionFilter: withInternalSourceExcluded(dimensionFilter),
   });
   return response;
 }
@@ -111,7 +112,7 @@ export async function fetchCountryBreakdown(
     metrics: [{ name: "totalUsers" }],
     orderBys: [{ metric: { metricName: "totalUsers" }, desc: true }],
     limit: 15,
-    ...(dimensionFilter && { dimensionFilter }),
+    dimensionFilter: withInternalSourceExcluded(dimensionFilter),
   });
   return response;
 }
@@ -128,7 +129,7 @@ export async function fetchDeviceBreakdown(
     dimensions: [{ name: "deviceCategory" }],
     metrics: [{ name: "totalUsers" }],
     orderBys: [{ metric: { metricName: "totalUsers" }, desc: true }],
-    ...(dimensionFilter && { dimensionFilter }),
+    dimensionFilter: withInternalSourceExcluded(dimensionFilter),
   });
   return response;
 }
