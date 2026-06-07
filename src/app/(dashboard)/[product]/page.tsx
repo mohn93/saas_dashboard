@@ -244,6 +244,7 @@ function ProductContent() {
           <ChartErrorBoundary fallbackMessage="Failed to load dashboard users chart">
             <VisitorsLineChart
               data={ulinkDashboardUsers.data?.visitorsOverTime || []}
+              signups={ulinkMetrics.data?.signupsOverTime}
               loading={ulinkDashboardUsers.loading}
               error={ulinkDashboardUsers.error}
               dashboardMode
