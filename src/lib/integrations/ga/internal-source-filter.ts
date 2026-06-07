@@ -21,18 +21,62 @@
 // like `notshared.ly` or `shared.ly.evil.com`.
 export const INTERNAL_SOURCE_REGEXP = "^(.*\\.)?(shared\\.ly|ulink\\.ly)$";
 
+// Exact sessionSource values that are internal artifacts, not real acquisition.
+//
+// The app used to send a `source` event parameter on internal CTAs
+// (PRICING_PAGE_VIEWED, UPGRADE_PROMPT_*, CHECKOUT_COMPLETED,
+// DOMAIN_CREATION_STARTED). `source` is a GA4-RESERVED param that overrides the
+// session's traffic source, so those CTA tags surfaced as sessionSource with
+// medium=(not set) and newUsers=0 — polluting "Website Visitors". The client now
+// emits `cta_source` instead (ulink PR #266), so going forward GA stops
+// recording these. This list cleans the data ALREADY recorded (the flywheel
+// re-queries GA live, so historical numbers improve too) and is defense in depth.
+//
+// `(not set)` is GA's own placeholder for sessions it can't attribute — never a
+// real source, safe to drop from acquisition KPIs.
+export const INTERNAL_SOURCE_TOKENS = [
+  "(not set)",
+  "landing",
+  "dashboard",
+  "links_creation_page",
+  "plan_billing",
+  "usage_dashboard",
+  "limit_blocker",
+  "subscription_flow",
+  "upgrade_flow",
+];
+
 type GAFilterExpression = Record<string, unknown>;
 
-/** A GA4 FilterExpression MATCHING sessions from our internal product domains. */
+/**
+ * A GA4 FilterExpression MATCHING sessions from internal traffic: either an
+ * internal product domain (regex) OR one of the internal CTA / unattributable
+ * source tokens (exact in-list).
+ */
 export function internalSourceMatchFilter(): GAFilterExpression {
   return {
-    filter: {
-      fieldName: "sessionSource",
-      stringFilter: {
-        matchType: "FULL_REGEXP",
-        value: INTERNAL_SOURCE_REGEXP,
-        caseSensitive: false,
-      },
+    orGroup: {
+      expressions: [
+        {
+          filter: {
+            fieldName: "sessionSource",
+            stringFilter: {
+              matchType: "FULL_REGEXP",
+              value: INTERNAL_SOURCE_REGEXP,
+              caseSensitive: false,
+            },
+          },
+        },
+        {
+          filter: {
+            fieldName: "sessionSource",
+            inListFilter: {
+              values: INTERNAL_SOURCE_TOKENS,
+              caseSensitive: false,
+            },
+          },
+        },
+      ],
     },
   };
 }
