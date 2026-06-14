@@ -174,10 +174,13 @@ export function useAgentStream(
         signal: controller.signal,
       });
       if (!res.ok) {
-        const msg =
-          res.status === 410
-            ? "This confirmation has expired. Please ask again."
-            : "Could not run the confirmed query.";
+        let msg = "Could not run the confirmed query.";
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          /* keep default */
+        }
         update((m) => ({ ...m, loading: false, phase: "error", error: msg }));
         return;
       }
@@ -214,7 +217,7 @@ export function useAgentStream(
       update((m) => (m.loading ? { ...m, loading: false } : m));
     } catch (err) {
       if (!(err instanceof DOMException && err.name === "AbortError")) {
-        update((m) => ({ ...m, loading: false, phase: "error", error: "Network error" }));
+        update((m) => ({ ...m, loading: false, phase: "error", error: m.error ?? "Network error" }));
       }
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
