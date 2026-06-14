@@ -79,6 +79,8 @@ export const supabaseMemory: MemoryStore = {
         success: entry.success,
         error: entry.error,
         user_email: entry.userEmail,
+        est_cost: entry.estCost ?? null,
+        est_rows: entry.estRows ?? null,
       })
       .select("id")
       .single();
