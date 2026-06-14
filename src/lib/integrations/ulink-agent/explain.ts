@@ -45,8 +45,8 @@ export function gateConfig(): { enabled: boolean; budget: Budget } {
   return {
     enabled: process.env.ULINK_AGENT_GATE_ENABLED === "true",
     budget: {
-      maxCost: Number(process.env.ULINK_AGENT_MAX_PLAN_COST ?? Number.MAX_SAFE_INTEGER),
-      maxRows: Number(process.env.ULINK_AGENT_MAX_PLAN_ROWS ?? Number.MAX_SAFE_INTEGER),
+      maxCost: Number(process.env.ULINK_AGENT_MAX_PLAN_COST || Number.MAX_SAFE_INTEGER),
+      maxRows: Number(process.env.ULINK_AGENT_MAX_PLAN_ROWS || Number.MAX_SAFE_INTEGER),
     },
   };
 }

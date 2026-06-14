@@ -11,8 +11,8 @@ export function getReadOnlyPool(): Pool {
     throw new Error("ULINK_READONLY_DATABASE_URL must be set");
   }
 
-  const statementTimeoutMs = Number(process.env.ULINK_AGENT_STATEMENT_TIMEOUT_MS ?? 8000);
-  const poolMax = Number(process.env.ULINK_AGENT_POOL_MAX ?? 4);
+  const statementTimeoutMs = Number(process.env.ULINK_AGENT_STATEMENT_TIMEOUT_MS || 8000);
+  const poolMax = Number(process.env.ULINK_AGENT_POOL_MAX || 4);
 
   pool = new Pool({
     connectionString,
