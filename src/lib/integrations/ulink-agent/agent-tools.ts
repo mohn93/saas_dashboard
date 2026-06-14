@@ -136,9 +136,10 @@ async function runQuery(
 
   ctx.emit({ type: "sql", sql: gen.sql });
 
-  // Cost-gate: EXPLAIN (plan only) before running. In shadow mode we log the
-  // estimate but never block; with the gate enabled an over-budget query is
-  // stashed and the user is asked to confirm.
+  // Cost-gate: EXPLAIN (plan only, never executes) runs on every query — even
+  // in shadow mode (gate disabled) — so the estimate lands in query_log
+  // (est_cost/est_rows) for threshold calibration. With the gate enabled, an
+  // over-budget query is stashed and the user is asked to confirm instead of running.
   const estimate = await estimateCost(ctx.execute, v.sql);
   const { enabled, budget } = gateConfig();
   if (enabled && estimate && exceedsBudget(estimate, budget)) {
@@ -153,6 +154,7 @@ async function runQuery(
       userEmail: ctx.userEmail,
       conversationId: ctx.conversationId,
     });
+    // Logged as success:false with a "gated:" error prefix — filter on that prefix to distinguish gated queries from real failures in the log.
     await ctx.memory.insertQueryLog({
       question,
       sql: gen.sql,
