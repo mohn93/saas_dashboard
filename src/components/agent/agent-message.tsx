@@ -100,18 +100,20 @@ export function AgentMessage({
 
       {/* cost-gate confirmation */}
       {message.pending && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+        <div role="alert" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
           <p className="text-amber-200">
             This query looks expensive (≈{Math.round(message.pending.estRows).toLocaleString()} rows,
             planner cost ≈{Math.round(message.pending.estCost).toLocaleString()}). Run it anyway?
           </p>
-          <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap rounded bg-background/60 p-2 font-mono text-[11px] text-muted-foreground">
+          <p className="mt-2 mb-1 text-xs text-muted-foreground/70">SQL that would run:</p>
+          <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded bg-background/60 p-2 font-mono text-[11px] text-muted-foreground">
             {message.pending.sql}
           </pre>
           <div className="mt-2 flex gap-2">
             <button
               onClick={() => onConfirm(message.id, message.pending!.token)}
               disabled={busy}
+              aria-label={`Run the expensive query anyway (≈${Math.round(message.pending.estRows).toLocaleString()} rows)`}
               className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500 disabled:opacity-50"
             >
               Run anyway
