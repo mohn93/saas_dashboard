@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseExplainResult, exceedsBudget, type CostEstimate } from "./explain";
+import { parseExplainResult, exceedsBudget, estimateCost, type CostEstimate } from "./explain";
 
 describe("parseExplainResult", () => {
   it("reads Total Cost and Plan Rows from EXPLAIN (FORMAT JSON) output", () => {
@@ -13,6 +13,11 @@ describe("parseExplainResult", () => {
   it("handles the plan already being an object (driver-parsed)", () => {
     const rows = [{ "QUERY PLAN": { Plan: { "Total Cost": 1, "Plan Rows": 2 } } }];
     expect(parseExplainResult(rows)).toEqual({ cost: 1, rows: 2 });
+  });
+
+  it("handles the QUERY PLAN being a JSON string", () => {
+    const rows = [{ "QUERY PLAN": '[{"Plan":{"Total Cost":7,"Plan Rows":9}}]' }];
+    expect(parseExplainResult(rows)).toEqual({ cost: 7, rows: 9 });
   });
 
   it("returns null when the shape is unrecognized", () => {
@@ -31,5 +36,23 @@ describe("exceedsBudget", () => {
   });
   it("does not trip when both are within budget", () => {
     expect(exceedsBudget(est, { maxCost: 100000, maxRows: 100000 })).toBe(false);
+  });
+});
+
+describe("estimateCost", () => {
+  it("returns the parsed estimate from EXPLAIN output", async () => {
+    const execute = async () => ({
+      columns: ["QUERY PLAN"],
+      rows: [{ "QUERY PLAN": [{ Plan: { "Total Cost": 50, "Plan Rows": 12 } }] }],
+      rowCount: 1,
+    });
+    expect(await estimateCost(execute, "select 1")).toEqual({ cost: 50, rows: 12 });
+  });
+
+  it("fails open (returns null) when execute throws", async () => {
+    const execute = async () => {
+      throw new Error("boom");
+    };
+    expect(await estimateCost(execute, "select 1")).toBeNull();
   });
 });
