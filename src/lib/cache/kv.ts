@@ -4,7 +4,7 @@ const CACHE_TTL_SECONDS = 15 * 60; // 15 minutes
 
 let _redis: Redis | null = null;
 
-function getRedis(): Redis {
+export function getRedis(): Redis {
   if (!_redis) {
     _redis = Redis.fromEnv();
   }
