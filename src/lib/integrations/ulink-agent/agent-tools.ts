@@ -1,5 +1,7 @@
 import { generateSql, type LLMClient, type ParsedToolCall, type ToolDef } from "./llm";
 import { validateSelect } from "./validate";
+import { estimateCost, exceedsBudget, gateConfig } from "./explain";
+import { stashPending } from "./pending";
 import { CHART_TYPES } from "./types";
 import type { AgentEvent } from "./events";
 import type { ChartSpec, DisplayMode, MemoryStore, QueryResult } from "./types";
@@ -70,6 +72,7 @@ export interface ToolContext {
   execute: (sql: string) => Promise<QueryResult>;
   emit: (event: AgentEvent) => void;
   userEmail: string | null;
+  conversationId: string | null;
   maxRows: number;
 }
 
@@ -77,6 +80,13 @@ export interface ToolOutcome {
   content: string; // tool result string fed back to the orchestrator
   logId?: string; // set by a successful query → becomes the turn's primary logId
   clarify?: string; // set by clarify → the loop terminates, asking this question
+  confirm?: {
+    token: string;
+    estCost: number;
+    estRows: number;
+    sql: string;
+    question: string;
+  }; // set when the cost-gate trips → the loop terminates, asking the user to confirm
 }
 
 async function runQuery(
@@ -125,6 +135,50 @@ async function runQuery(
   }
 
   ctx.emit({ type: "sql", sql: gen.sql });
+
+  // Cost-gate: EXPLAIN (plan only) before running. In shadow mode we log the
+  // estimate but never block; with the gate enabled an over-budget query is
+  // stashed and the user is asked to confirm.
+  const estimate = await estimateCost(ctx.execute, v.sql);
+  const { enabled, budget } = gateConfig();
+  if (enabled && estimate && exceedsBudget(estimate, budget)) {
+    const token = await stashPending({
+      rawSql: gen.sql,
+      wrappedSql: v.sql,
+      chart: gen.chart,
+      question,
+      display,
+      estCost: estimate.cost,
+      estRows: estimate.rows,
+      userEmail: ctx.userEmail,
+      conversationId: ctx.conversationId,
+    });
+    await ctx.memory.insertQueryLog({
+      question,
+      sql: gen.sql,
+      attempts: 1,
+      rowCount: null,
+      success: false,
+      error: "gated: estimated cost over budget (awaiting confirmation)",
+      userEmail: ctx.userEmail,
+      estCost: estimate.cost,
+      estRows: estimate.rows,
+    });
+    return {
+      content: JSON.stringify({
+        gated: true,
+        message: "Query is estimated to be expensive; awaiting user confirmation.",
+      }),
+      confirm: {
+        token,
+        estCost: estimate.cost,
+        estRows: estimate.rows,
+        sql: gen.sql,
+        question,
+      },
+    };
+  }
+
   ctx.emit({ type: "phase", phase: "running" });
 
   let result: QueryResult;
@@ -140,6 +194,8 @@ async function runQuery(
       success: false,
       error,
       userEmail: ctx.userEmail,
+      estCost: estimate?.cost ?? null,
+      estRows: estimate?.rows ?? null,
     });
     return { content: JSON.stringify({ error }) };
   }
@@ -161,6 +217,8 @@ async function runQuery(
     success: true,
     error: null,
     userEmail: ctx.userEmail,
+    estCost: estimate?.cost ?? null,
+    estRows: estimate?.rows ?? null,
   });
 
   return {

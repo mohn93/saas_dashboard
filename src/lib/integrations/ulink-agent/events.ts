@@ -15,6 +15,14 @@ export type AgentEvent =
       chart: ChartSpec | null;
       display: DisplayMode;
     }
+  | {
+      type: "confirm_required";
+      token: string;
+      estCost: number;
+      estRows: number;
+      sql: string;
+      question: string;
+    }
   | { type: "narration"; delta: string }
   | { type: "done"; logId: string | null }
   | { type: "error"; error: string }

@@ -57,6 +57,7 @@ function ctxWith(opts: {
     execute: opts.execute,
     emit: (e) => opts.events.push(e),
     userEmail: "pm@x.com",
+    conversationId: null,
     maxRows: 1000,
   };
 }
@@ -78,7 +79,8 @@ describe("dispatchTool: query", () => {
       { id: "c1", name: "query", arguments: JSON.stringify({ question: "how many links?" }) },
       ctx
     );
-    expect(execute).toHaveBeenCalledTimes(1);
+    // execute is called twice: once for EXPLAIN (cost-gate) and once for the real query
+    expect(execute).toHaveBeenCalledTimes(2);
     expect(events.map((e) => e.type)).toEqual(expect.arrayContaining(["step", "sql", "result"]));
     expect(outcome.logId).toBe("log-1");
     const parsed = JSON.parse(outcome.content);

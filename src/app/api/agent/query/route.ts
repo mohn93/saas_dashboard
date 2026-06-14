@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       try {
         try {
           await runAgent(
-            { question, userEmail, history },
+            { question, userEmail, conversationId, history },
             {
               orchestrator: getFastClient(),
               reasoner: getDeepSeekClient(),
@@ -65,7 +65,8 @@ export async function POST(request: NextRequest) {
         // Persist the turn (best-effort: never break the answer if storage fails).
         // The dashboard composer streams with persist:false — it composes a widget and
         // must not create a conversation.
-        if (persist) {
+        const awaitingConfirm = collected.some((e) => e.type === "confirm_required");
+        if (persist && !awaitingConfirm) {
           try {
             const { conversationId: id, title } = await persistTurn(conversationStore, {
               question,

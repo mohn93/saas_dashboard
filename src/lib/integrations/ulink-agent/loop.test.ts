@@ -64,7 +64,8 @@ describe("runAgent (tool-calling loop)", () => {
     expect(narration && "delta" in narration && narration.delta).toContain("5 links");
     const done = events.find((e) => e.type === "done");
     expect(done && "logId" in done && done.logId).toBe("log-1");
-    expect(execute).toHaveBeenCalledTimes(1);
+    // execute is called twice: once for EXPLAIN (cost-gate) and once for the real query
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 
   it("chat path: answers directly with no tool calls", async () => {
