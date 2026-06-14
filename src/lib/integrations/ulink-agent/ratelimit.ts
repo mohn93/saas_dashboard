@@ -5,6 +5,7 @@ export function parseWindow(spec: string): number {
   const m = /^(\d+)\s*([smh])$/.exec(spec.trim());
   if (!m) return 3600;
   const n = Number(m[1]);
+  if (n <= 0) return 3600;
   const unit = m[2];
   if (unit === "s") return n;
   if (unit === "m") return n * 60;
@@ -20,14 +21,17 @@ export interface RateLimitResult {
 // Fixed-window counter keyed per user. Cheap (one INCR + conditional EXPIRE) and
 // dependency-free on top of @upstash/redis. Fails open if Redis is unreachable.
 export async function checkAgentRateLimit(email: string): Promise<RateLimitResult> {
-  const limit = Number(process.env.ULINK_AGENT_RATE_LIMIT || 30);
+  const parsedLimit = Number(process.env.ULINK_AGENT_RATE_LIMIT);
+  const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 30;
   const windowSec = parseWindow(process.env.ULINK_AGENT_RATE_WINDOW || "1h");
   const bucket = Math.floor(Date.now() / 1000 / windowSec);
   const key = `agent:rl:${email}:${bucket}`;
   try {
     const redis = getRedis();
-    const count = await redis.incr(key);
-    if (count === 1) await redis.expire(key, windowSec);
+    const pipe = redis.pipeline();
+    pipe.incr(key);
+    pipe.expire(key, windowSec, "NX");
+    const [count] = (await pipe.exec()) as [number, number];
     return { ok: count <= limit, remaining: Math.max(0, limit - count), limit };
   } catch {
     return { ok: true, remaining: limit, limit };

@@ -10,5 +10,6 @@ describe("parseWindow", () => {
   it("falls back to 3600 on garbage", () => {
     expect(parseWindow("")).toBe(3600);
     expect(parseWindow("nope")).toBe(3600);
+    expect(parseWindow("0s")).toBe(3600);
   });
 });
