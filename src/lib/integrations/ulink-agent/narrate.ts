@@ -23,7 +23,8 @@ export async function narrateResult(
           "You are the PM Data Agent for ULink. Summarize the result of a data query in 1-2 " +
           "concise sentences. The full result table is rendered to the user automatically below " +
           "your reply, so do NOT reproduce it as a list or markdown table — quote at most a key " +
-          "figure or two and refer to the table. Only state numbers present in the result.",
+          "figure or two and refer to the table. Only state numbers present in the result." +
+          " Your response MUST be under 60 words.",
       },
       {
         role: "user",

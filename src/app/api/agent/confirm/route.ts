@@ -11,7 +11,8 @@ import type { AgentEvent } from "@/lib/integrations/ulink-agent/events";
 import type { QueryResult } from "@/lib/integrations/ulink-agent/types";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// No R1 loop here — just one read-only query + a single fast narration call.
+export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   let body: { token?: unknown };
@@ -60,7 +61,8 @@ export async function POST(request: NextRequest) {
 
         let result: QueryResult;
         try {
-          result = await executeReadOnly(v.sql);
+          // Execute the exact SQL the user approved (validated + wrapped at stash time); the re-validate above is just a safety gate.
+          result = await executeReadOnly(pending.wrappedSql);
         } catch (err) {
           const error = err instanceof Error ? err.message : "Query failed";
           await supabaseMemory.insertQueryLog({
@@ -88,17 +90,25 @@ export async function POST(request: NextRequest) {
           display: pending.display,
         });
 
-        const logId = await supabaseMemory.insertQueryLog({
-          question: pending.question,
-          sql: pending.rawSql,
-          attempts: 1,
-          rowCount: result.rowCount,
-          success: true,
-          error: null,
-          userEmail,
-          estCost: pending.estCost,
-          estRows: pending.estRows,
-        });
+        // The user already has their data (result emitted above); a logging
+        // failure must not abort the stream.
+        let logId: string | null = null;
+        try {
+          logId = await supabaseMemory.insertQueryLog({
+            question: pending.question,
+            sql: pending.rawSql,
+            attempts: 1,
+            rowCount: result.rowCount,
+            success: true,
+            error: null,
+            userEmail,
+            estCost: pending.estCost,
+            estRows: pending.estRows,
+          });
+        } catch (logErr) {
+          console.error("Insert confirmed query log failed:", logErr);
+          logId = null;
+        }
 
         try {
           await narrateResult(getFastClient(), pending.question, result, (delta) =>
