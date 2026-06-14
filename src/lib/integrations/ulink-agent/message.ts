@@ -21,6 +21,7 @@ export interface AgentMessage {
   logId: string | null;
   loading: boolean;
   feedback: "up" | "down" | null;
+  pending: { token: string; estCost: number; estRows: number; sql: string } | null;
 }
 
 export function emptyMessage(id: string, question: string): AgentMessage {
@@ -39,6 +40,7 @@ export function emptyMessage(id: string, question: string): AgentMessage {
     logId: null,
     loading: true,
     feedback: null,
+    pending: null,
   };
 }
 
@@ -65,6 +67,13 @@ export function applyEvent(m: AgentMessage, e: AgentEvent): AgentMessage {
       return { ...m, logId: e.logId, loading: false, phase: "done" };
     case "error":
       return { ...m, error: e.error, loading: false, phase: "error" };
+    case "confirm_required":
+      return {
+        ...m,
+        pending: { token: e.token, estCost: e.estCost, estRows: e.estRows, sql: e.sql },
+        loading: false,
+        phase: "done",
+      };
     case "conversation":
       return m; // conversation-level signal; handled by the hook, not the message
     default:
