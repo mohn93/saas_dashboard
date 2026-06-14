@@ -26,17 +26,17 @@ export async function stashPending(p: PendingQuery): Promise<string> {
   return token;
 }
 
-// One-shot retrieval scoped to the caller's email. Deletes the token so a
-// confirmation can't be replayed. Returns null if missing/expired or if the
-// requester is not the user who created it.
+// One-shot, replay-proof retrieval. GETDEL makes the read+delete atomic, so two
+// concurrent confirmations of the same token can't both execute the query. Note:
+// a token whose stored email doesn't match the requester is still consumed (the
+// atomic delete happens first) — acceptable, since a mismatch means a bug or an
+// attempt to redeem someone else's token, never a normal flow.
 export async function takePending(
   token: string,
   requesterEmail: string | null
 ): Promise<PendingQuery | null> {
-  const redis = getRedis();
-  const p = await redis.get<PendingQuery>(key(token));
+  const p = await getRedis().getdel<PendingQuery>(key(token));
   if (!p) return null;
   if (p.userEmail !== requesterEmail) return null;
-  await redis.del(key(token));
   return p;
 }
