@@ -34,3 +34,19 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+### ULink Agent performance guardrails
+
+The PM Data Agent runs LLM-generated SQL read-only. To protect the database:
+
+- **Read replica:** `ULINK_READONLY_DATABASE_URL` must point at a read replica, not
+  the primary. Run `supabase/ulink_agent_perf_guardrails.sql` once to add the
+  `query_log` cost columns and set `statement_timeout`/`work_mem` on `pm_readonly`.
+- **Cost-gate (shadow first):** Deploy with `ULINK_AGENT_GATE_ENABLED=false`. Every
+  query's planner estimate is logged to `pm_agent.query_log` (`est_cost`,
+  `est_rows`). After a few days, set `ULINK_AGENT_MAX_PLAN_COST` /
+  `ULINK_AGENT_MAX_PLAN_ROWS` from observed percentiles and set
+  `ULINK_AGENT_GATE_ENABLED=true`. Over-budget queries then prompt the user to
+  "Run anyway".
+- **Rate limit:** `ULINK_AGENT_RATE_LIMIT` queries per `ULINK_AGENT_RATE_WINDOW`
+  per user.
