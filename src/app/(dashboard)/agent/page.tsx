@@ -37,7 +37,7 @@ export default function AgentPage() {
   const onConversation = useCallback(() => {
     void list.refresh();
   }, [list.refresh]);
-  const { messages, conversationId, busy, loadingThread, ask, sendFeedback, load, newChat } =
+  const { messages, conversationId, busy, loadingThread, ask, sendFeedback, confirm, load, newChat } =
     useAgentStream(onConversation);
   const [input, setInput] = useState("");
 
@@ -117,7 +117,7 @@ export default function AgentPage() {
                   </p>
                 )}
                 {messages.map((m) => (
-                  <AgentMessage key={m.id} message={m} onFeedback={sendFeedback} />
+                  <AgentMessage key={m.id} message={m} onFeedback={sendFeedback} onConfirm={confirm} busy={busy} />
                 ))}
               </>
             )}
