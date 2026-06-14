@@ -5,6 +5,7 @@ import { supabaseMemory } from "@/lib/integrations/ulink-agent/memory";
 import { conversationStore, persistTurn } from "@/lib/integrations/ulink-agent/conversations";
 import { executeReadOnly } from "@/lib/integrations/ulink-agent/client";
 import { getSessionEmail } from "@/lib/auth/session";
+import { checkAgentRateLimit } from "@/lib/integrations/ulink-agent/ratelimit";
 import type { ConversationTurn } from "@/lib/integrations/ulink-agent/types";
 import type { AgentEvent } from "@/lib/integrations/ulink-agent/events";
 
@@ -33,6 +34,16 @@ export async function POST(request: NextRequest) {
 
   if (!userEmail) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  }
+
+  const rl = await checkAgentRateLimit(userEmail);
+  if (!rl.ok) {
+    return new Response(
+      JSON.stringify({
+        error: `Rate limit reached (${rl.limit} queries per window). Try again later.`,
+      }),
+      { status: 429 }
+    );
   }
 
   const encoder = new TextEncoder();
