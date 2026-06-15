@@ -39,9 +39,15 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 The PM Data Agent runs LLM-generated SQL read-only. To protect the database:
 
-- **Read replica:** `ULINK_READONLY_DATABASE_URL` must point at a read replica, not
-  the primary. Run `supabase/ulink_agent_perf_guardrails.sql` once to add the
-  `query_log` cost columns and set `statement_timeout`/`work_mem` on `pm_readonly`.
+- **Connection / role:** `ULINK_READONLY_DATABASE_URL` connects as the `pm_readonly`
+  role, which is `SELECT`-only on the `public` schema (no writes; no access to
+  `auth`/`vault`/other schemas). ULink runs on a **single primary** (no read
+  replica), so the agent's queries share the DB with production traffic — the
+  cost-gate, `statement_timeout`, and these grants are the protection, not a
+  replica. If agent load grows, add a Supabase read replica (Pro add-on) and point
+  this URL at it. `supabase/ulink_agent_perf_guardrails.sql` adds the `query_log`
+  cost columns and sets `statement_timeout=8s`/`work_mem` on `pm_readonly` (already
+  applied to the ULink project).
 - **Cost-gate (shadow first):** Deploy with `ULINK_AGENT_GATE_ENABLED=false`. Every
   query's planner estimate is logged to `pm_agent.query_log` (`est_cost`,
   `est_rows`). After a few days, set `ULINK_AGENT_MAX_PLAN_COST` /
