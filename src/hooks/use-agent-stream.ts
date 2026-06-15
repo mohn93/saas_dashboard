@@ -76,6 +76,17 @@ export function useAgentStream(
         body: JSON.stringify({ question, history, conversationId }),
         signal: controller.signal,
       });
+      if (!res.ok) {
+        let msg = "Request failed.";
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          /* keep default */
+        }
+        update((m) => ({ ...m, loading: false, phase: "error", error: msg }));
+        return;
+      }
       if (!res.body) throw new Error("No response stream");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -140,6 +151,80 @@ export function useAgentStream(
     }
   }
 
+  async function confirm(messageId: string, token: string) {
+    if (busy) return;
+    setBusy(true);
+    cancelInFlight();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const runToken = runRef.current;
+    const isCurrent = () => runRef.current === runToken && !controller.signal.aborted;
+
+    const update = (fn: (m: AgentMessage) => AgentMessage) =>
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? fn(m) : m)));
+
+    // Clear the confirm card and show the running state on the same message.
+    update((m) => ({ ...m, pending: null, loading: true, phase: "running", error: null }));
+
+    try {
+      const res = await fetch("/api/agent/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        let msg = "Could not run the confirmed query.";
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          /* keep default */
+        }
+        update((m) => ({ ...m, loading: false, phase: "error", error: msg }));
+        return;
+      }
+      if (!res.body) throw new Error("No response stream");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const consume = (line: string) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        try {
+          const event = JSON.parse(trimmed) as AgentEvent;
+          if (event.type === "conversation") {
+            if (isCurrent()) {
+              setConversationId(event.conversationId);
+              onConversation?.({ id: event.conversationId, title: event.title });
+            }
+            return;
+          }
+          update((m) => applyEvent(m, event));
+        } catch {
+          /* skip malformed line */
+        }
+      };
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) consume(line);
+      }
+      consume(buffer);
+      update((m) => (m.loading ? { ...m, loading: false } : m));
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        update((m) => ({ ...m, loading: false, phase: "error", error: m.error ?? "Network error" }));
+      }
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
+      setBusy(false);
+    }
+  }
+
   async function load(id: string) {
     cancelInFlight(); // a stream from the previous conversation must not bleed in
     setBusy(false);
@@ -167,5 +252,5 @@ export function useAgentStream(
     setConversationId(null);
   }
 
-  return { messages, conversationId, busy, loadingThread, ask, sendFeedback, load, newChat };
+  return { messages, conversationId, busy, loadingThread, ask, sendFeedback, confirm, load, newChat };
 }

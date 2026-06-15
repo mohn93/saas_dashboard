@@ -15,6 +15,7 @@ export interface AgentDeps {
 export interface AgentInput {
   question: string;
   userEmail: string | null;
+  conversationId?: string | null;
   history?: ConversationTurn[];
 }
 
@@ -82,6 +83,7 @@ export async function runAgent(
       execute: deps.execute,
       emit,
       userEmail: input.userEmail,
+      conversationId: input.conversationId ?? null,
       maxRows,
     };
     let primaryLogId: string | null = null;
@@ -106,6 +108,19 @@ export async function runAgent(
           messages.push({ role: "tool", tool_call_id: call.id, content: outcome.content });
           if (outcome.clarify) {
             emit({ type: "narration", delta: outcome.clarify });
+            emit({ type: "phase", phase: "done" });
+            emit({ type: "done", logId: null });
+            return;
+          }
+          if (outcome.confirm) {
+            emit({
+              type: "confirm_required",
+              token: outcome.confirm.token,
+              estCost: outcome.confirm.estCost,
+              estRows: outcome.confirm.estRows,
+              sql: outcome.confirm.sql,
+              question: outcome.confirm.question,
+            });
             emit({ type: "phase", phase: "done" });
             emit({ type: "done", logId: null });
             return;

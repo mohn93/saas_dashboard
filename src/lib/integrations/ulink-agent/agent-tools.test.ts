@@ -1,8 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchTool, TOOL_DEFS, type ToolContext } from "./agent-tools";
+import { stashPending } from "./pending";
 import type { LLMClient } from "./llm";
 import type { AgentEvent } from "./events";
 import type { MemoryStore, QueryResult } from "./types";
+
+// Stub the pending stash so the gate-trip test never touches Redis.
+vi.mock("./pending", () => ({ stashPending: vi.fn().mockResolvedValue("tok-123") }));
 
 function fakeMemory(overrides: Partial<MemoryStore> = {}): MemoryStore {
   return {
@@ -57,6 +61,7 @@ function ctxWith(opts: {
     execute: opts.execute,
     emit: (e) => opts.events.push(e),
     userEmail: "pm@x.com",
+    conversationId: null,
     maxRows: 1000,
   };
 }
@@ -78,7 +83,8 @@ describe("dispatchTool: query", () => {
       { id: "c1", name: "query", arguments: JSON.stringify({ question: "how many links?" }) },
       ctx
     );
-    expect(execute).toHaveBeenCalledTimes(1);
+    // execute is called twice: once for EXPLAIN (cost-gate) and once for the real query
+    expect(execute).toHaveBeenCalledTimes(2);
     expect(events.map((e) => e.type)).toEqual(expect.arrayContaining(["step", "sql", "result"]));
     expect(outcome.logId).toBe("log-1");
     const parsed = JSON.parse(outcome.content);
@@ -164,6 +170,77 @@ describe("dispatchTool: query", () => {
     expect(JSON.parse(outcome.content).error).toContain("boom");
     expect(insertQueryLog).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
     expect(outcome.logId).toBeUndefined();
+  });
+});
+
+describe("dispatchTool: query — cost-gate trips", () => {
+  const prevEnabled = process.env.ULINK_AGENT_GATE_ENABLED;
+  const prevMaxCost = process.env.ULINK_AGENT_MAX_PLAN_COST;
+  const prevMaxRows = process.env.ULINK_AGENT_MAX_PLAN_ROWS;
+
+  afterEach(() => {
+    // Restore env so the rest of the suite stays in shadow mode (gate disabled).
+    process.env.ULINK_AGENT_GATE_ENABLED = prevEnabled;
+    process.env.ULINK_AGENT_MAX_PLAN_COST = prevMaxCost;
+    process.env.ULINK_AGENT_MAX_PLAN_ROWS = prevMaxRows;
+    vi.mocked(stashPending).mockClear();
+  });
+
+  // EXPLAIN (FORMAT JSON) result that parses to a cost/rows estimate over budget.
+  const explainResult: QueryResult = {
+    columns: ["QUERY PLAN"],
+    rows: [{ "QUERY PLAN": [{ Plan: { "Total Cost": 999999, "Plan Rows": 999999 } }] }],
+    rowCount: 1,
+  };
+
+  it("stashes + returns confirm and never executes the query when over budget", async () => {
+    process.env.ULINK_AGENT_GATE_ENABLED = "true";
+    process.env.ULINK_AGENT_MAX_PLAN_COST = "0";
+    process.env.ULINK_AGENT_MAX_PLAN_ROWS = "0";
+
+    const events: AgentEvent[] = [];
+    const insertQueryLog = vi.fn().mockResolvedValue("log-gated");
+    // execute is called only for EXPLAIN; the real query must NOT run.
+    const execute = vi.fn().mockResolvedValue(explainResult);
+    const ctx = ctxWith({
+      reasoner: reasonerReturning("SELECT count(*) AS n FROM links"),
+      execute,
+      events,
+      memory: fakeMemory({ insertQueryLog }),
+    });
+    const outcome = await dispatchTool(
+      { id: "c1", name: "query", arguments: JSON.stringify({ question: "how many links?" }) },
+      ctx
+    );
+
+    // EXPLAIN only — the actual query is gated, so execute fires exactly once.
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledWith(expect.stringContaining("EXPLAIN"));
+    // No result was streamed (the query never ran).
+    expect(events.some((e) => e.type === "result")).toBe(false);
+
+    // The query was stashed for later confirmation.
+    expect(stashPending).toHaveBeenCalledTimes(1);
+
+    // The outcome carries a confirm payload with the token + estimate.
+    expect(outcome.confirm).toEqual({
+      token: "tok-123",
+      estCost: 999999,
+      estRows: 999999,
+      sql: "SELECT count(*) AS n FROM links",
+      question: "how many links?",
+    });
+    expect(JSON.parse(outcome.content).gated).toBe(true);
+
+    // A gated row was logged: success:false with the "gated:" error prefix + estimate.
+    expect(insertQueryLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false,
+        error: expect.stringContaining("gated:"),
+        estCost: 999999,
+        estRows: 999999,
+      })
+    );
   });
 });
 

@@ -75,6 +75,8 @@ export interface QueryLogEntry {
   success: boolean;
   error: string | null;
   userEmail: string | null;
+  estCost?: number | null;
+  estRows?: number | null;
 }
 
 export interface MemoryStore {

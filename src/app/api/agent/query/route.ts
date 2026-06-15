@@ -5,6 +5,7 @@ import { supabaseMemory } from "@/lib/integrations/ulink-agent/memory";
 import { conversationStore, persistTurn } from "@/lib/integrations/ulink-agent/conversations";
 import { executeReadOnly } from "@/lib/integrations/ulink-agent/client";
 import { getSessionEmail } from "@/lib/auth/session";
+import { checkAgentRateLimit } from "@/lib/integrations/ulink-agent/ratelimit";
 import type { ConversationTurn } from "@/lib/integrations/ulink-agent/types";
 import type { AgentEvent } from "@/lib/integrations/ulink-agent/events";
 
@@ -35,6 +36,16 @@ export async function POST(request: NextRequest) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
 
+  const rl = await checkAgentRateLimit(userEmail);
+  if (!rl.ok) {
+    return new Response(
+      JSON.stringify({
+        error: `Rate limit reached (${rl.limit} queries per window). Try again later.`,
+      }),
+      { status: 429 }
+    );
+  }
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -46,7 +57,7 @@ export async function POST(request: NextRequest) {
       try {
         try {
           await runAgent(
-            { question, userEmail, history },
+            { question, userEmail, conversationId, history },
             {
               orchestrator: getFastClient(),
               reasoner: getDeepSeekClient(),
@@ -65,7 +76,8 @@ export async function POST(request: NextRequest) {
         // Persist the turn (best-effort: never break the answer if storage fails).
         // The dashboard composer streams with persist:false — it composes a widget and
         // must not create a conversation.
-        if (persist) {
+        const awaitingConfirm = collected.some((e) => e.type === "confirm_required");
+        if (persist && !awaitingConfirm) {
           try {
             const { conversationId: id, title } = await persistTurn(conversationStore, {
               question,

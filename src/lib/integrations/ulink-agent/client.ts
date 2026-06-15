@@ -11,16 +11,23 @@ export function getReadOnlyPool(): Pool {
     throw new Error("ULINK_READONLY_DATABASE_URL must be set");
   }
 
+  const statementTimeoutMs = Number(process.env.ULINK_AGENT_STATEMENT_TIMEOUT_MS || 8000);
+  const poolMax = Number(process.env.ULINK_AGENT_POOL_MAX || 4);
+
   pool = new Pool({
     connectionString,
-    max: 4,
+    max: poolMax,
     ssl: { rejectUnauthorized: false },
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
   });
 
   // Enforce read-only + a hard statement timeout on every connection.
   pool.on("connect", (client) => {
     client
-      .query("SET default_transaction_read_only = on; SET statement_timeout = 15000;")
+      .query(
+        `SET default_transaction_read_only = on; SET statement_timeout = ${statementTimeoutMs};`
+      )
       .catch((err) => console.error("Read-only pool SET failed:", err));
   });
 
