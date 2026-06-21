@@ -29,16 +29,38 @@ function getMonthlyRate(sub: RawSubscriptionRow): number {
   return sub.price_monthly || 0;
 }
 
+/** Statuses that count toward live MRR (a subscription that is paying now). */
+const ACTIVE_MRR_STATUSES = new Set(["active", "trialing"]);
+
 /**
- * Calculate current MRR from active subscriptions.
+ * The day a subscription stops contributing to MRR, or null if it is still live.
+ *
+ * Only canceled subscriptions have an end date. Active/trialing subs are
+ * open-ended — their current_period_end is just the next renewal, not an end.
+ * Per product decision, MRR drops on canceled_at; for legacy canceled rows that
+ * predate canceled_at being recorded, fall back to current_period_end.
  */
-function calculateMRR(subscriptions: RawSubscriptionRow[]): number {
-  return subscriptions.reduce((sum, sub) => sum + getMonthlyRate(sub), 0);
+function mrrEndDate(sub: RawSubscriptionRow): string | null {
+  if (sub.status !== "canceled") return null;
+  const end = sub.canceled_at ?? sub.current_period_end;
+  return end ? format(parseISO(end), "yyyy-MM-dd") : null;
 }
 
 /**
- * Compute MRR for each day in the range based on subscription created_at dates.
- * A subscription contributes to MRR from its created_at date onward.
+ * Calculate current MRR from subscriptions that are paying now (active/trialing).
+ * Canceled rows may be present in the input (for the time series) but must not
+ * count toward the live number.
+ */
+function calculateMRR(subscriptions: RawSubscriptionRow[]): number {
+  return subscriptions
+    .filter((sub) => ACTIVE_MRR_STATUSES.has(sub.status))
+    .reduce((sum, sub) => sum + getMonthlyRate(sub), 0);
+}
+
+/**
+ * Compute MRR for each day in the range.
+ * A subscription contributes from its created_at date until its end date
+ * (the cancellation day for canceled subs), so cancellations show up as dips.
  */
 function computeMRROverTime(
   subscriptions: RawSubscriptionRow[],
@@ -47,10 +69,12 @@ function computeMRROverTime(
   return allDates.map((date) => {
     const mrr = subscriptions.reduce((sum, sub) => {
       const activatedOn = format(parseISO(sub.created_at), "yyyy-MM-dd");
-      if (activatedOn <= date) {
-        return sum + getMonthlyRate(sub);
-      }
-      return sum;
+      if (activatedOn > date) return sum; // not created yet
+
+      const endOn = mrrEndDate(sub);
+      if (endOn !== null && date >= endOn) return sum; // already canceled by this day
+
+      return sum + getMonthlyRate(sub);
     }, 0);
     return { date, mrr };
   });

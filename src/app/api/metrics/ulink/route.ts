@@ -4,7 +4,7 @@ import { fetchKPIs } from "@/lib/integrations/ga/queries";
 import { transformKPIs } from "@/lib/integrations/ga/transform";
 import {
   fetchSignups,
-  fetchActiveSubscriptions,
+  fetchSubscriptions,
   fetchActiveProjects,
   fetchPaidCohortCount,
 } from "@/lib/integrations/ulink/queries";
@@ -34,7 +34,7 @@ async function computeFreshMetrics(
   const [signupsResult, subsResult, gaKpisRaw, activeProjects, paidInCohort] =
     await Promise.all([
       fetchSignups(startDate, endDate),
-      fetchActiveSubscriptions(),
+      fetchSubscriptions(),
       fetchKPIs(productConfig.gaPropertyId, { start, end }),
       fetchActiveProjects(startDate, endDate),
       fetchPaidCohortCount(startDate, endDate),

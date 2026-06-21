@@ -13,6 +13,7 @@ export interface RawSubscriptionRow {
   current_period_start: string;
   current_period_end: string;
   created_at: string;
+  canceled_at: string | null;
 }
 
 /**
@@ -107,21 +108,25 @@ export async function fetchPaidCohortCount(
 }
 
 /**
- * Fetch active/trialing subscriptions with their plan pricing.
+ * Fetch subscriptions with their plan pricing.
+ *
+ * Includes active/trialing subscriptions (which count toward live MRR) AND
+ * canceled ones, so the MRR-over-time series can subtract them at their
+ * cancellation date and show cancellations as dips. `totalPaidUsers` counts
+ * only the active/trialing rows.
  */
-export async function fetchActiveSubscriptions(): Promise<{
+export async function fetchSubscriptions(): Promise<{
   subscriptions: RawSubscriptionRow[];
   totalPaidUsers: number;
 }> {
   const supabase = getULinkClient();
 
-  const { data, error, count } = await supabase
+  const { data, error } = await supabase
     .from("subscriptions")
     .select(
-      "id, status, current_period_start, current_period_end, subscription_plans(price_monthly, price_yearly), created_at",
-      { count: "exact" }
+      "id, status, current_period_start, current_period_end, subscription_plans(price_monthly, price_yearly), created_at, canceled_at"
     )
-    .in("status", ["active", "trialing"])
+    .in("status", ["active", "trialing", "canceled"])
     .eq("environment", "production");
 
   if (error) {
@@ -139,10 +144,15 @@ export async function fetchActiveSubscriptions(): Promise<{
       current_period_start: row.current_period_start as string,
       current_period_end: row.current_period_end as string,
       created_at: row.created_at as string,
+      canceled_at: (row.canceled_at as string | null) ?? null,
     };
   });
 
-  return { subscriptions, totalPaidUsers: count || 0 };
+  const totalPaidUsers = subscriptions.filter(
+    (s) => s.status === "active" || s.status === "trialing"
+  ).length;
+
+  return { subscriptions, totalPaidUsers };
 }
 
 
